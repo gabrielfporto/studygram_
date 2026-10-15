@@ -1,16 +1,7 @@
-// Contratos futuros: nenhuma integração fictícia é oferecida como serviço funcional.
-export interface StudyLogProposal {
-  minutes: number; competencyIds: string[]; method: 'reading' | 'recall' | 'questions';
-  confidence: number; needsConfirmation: boolean;
-}
-export interface RelevantContext { competencies: { id: string; title: string }[] }
+import type { AIRequest,AICandidate,AIProposal } from '../application/ai.js';
+// O provedor é substituível; o núcleo recebe apenas propostas validadas.
 export interface AIService {
-  interpretStudyLog(text: string, context: RelevantContext): Promise<StudyLogProposal>;
-  generateRecallQuestion(competencyId: string, context: string): Promise<{ question: string; rubric: string }>;
-  classifyError(text: string, context: RelevantContext): Promise<{ competencyId: string; confidence: number }>;
-  analyzePerformance(summary: string): Promise<{ observations: string[] }>;
-  explainPriority(factors: Record<string, number>): Promise<string>;
-  suggestCompetencies(topic: string): Promise<{ titles: string[] }>;
+  propose(request:AIRequest,candidates:AICandidate[]):Promise<{proposal:AIProposal;inputTokens:number;outputTokens:number}>;
 }
 export interface CalendarSource {
   readBusyWindows(from: Date, to: Date): Promise<{ start: Date; end: Date; status: 'busy' | 'free' | 'cancelled' }[]>;

@@ -192,6 +192,16 @@ test('Migrations: PostgreSQL, RLS entre dois usuários, grants e FKs compostas',
     await db.exec('reset role;set role anon;');
     await assert.rejects(db.query('select save_academic_event($1,$2,$3,$4,$5,$6::uuid[])',eventArgs),/permission denied/);
     await db.exec(`reset role;set role authenticated;select set_config('request.jwt.claim.sub','${a}',false);`);
+    await assert.rejects(db.query('select reserve_ai_request($1,$2,$3,$4,$5)',[a,id(400),'log','model','a'.repeat(64)]),/permission denied/);
+    await db.exec('reset role;set role service_role;');
+    const reserve=(request:number,hash:string)=>db.query<{reserve_ai_request:{status:string;result?:unknown}}>('select reserve_ai_request($1,$2,$3,$4,$5)',[a,id(request),'log','model',hash.repeat(64)]);
+    assert.equal((await reserve(400,'a')).rows[0]!.reserve_ai_request.status,'reserved');
+    assert.equal((await reserve(401,'a')).rows[0]!.reserve_ai_request.status,'pending');
+    await db.exec(`update ai_usage set status='completed',result='{"minutes":30}'::jsonb where user_id='${a}' and request_id='${id(400)}';`);
+    assert.equal((await reserve(402,'a')).rows[0]!.reserve_ai_request.status,'cached');
+    assert.equal((await reserve(403,'b')).rows[0]!.reserve_ai_request.status,'reserved');
+    await assert.rejects(reserve(404,'c'),/AI_LIMIT/);
+    await assert.rejects(reserve(400,'b'),/REQUEST_MISMATCH/);
     await db.exec(`reset role; delete from auth.users where id = '${a}';`);
     for (const { tablename } of tables) {
       const remaining = (await db.query<{ user_id: string }>(`select user_id from ${tablename}`)).rows;

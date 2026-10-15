@@ -264,3 +264,30 @@ test('Competência: ajuste altera parâmetros sem substituir o estado de memóri
   fireEvent.change(screen.getByLabelText('Importância'),{target:{value:'1'}});fireEvent.click(screen.getByRole('button',{name:'Salvar ajustes'}));
   await waitFor(()=>assert(screen.getByText(/Histórico e memória preservados/)));assert.equal(values.importance,1);assert.equal('card' in values,false);
 });
+
+test('IA: geração mostra prévia, preserva campos desconhecidos e exige confirmação para salvar',async()=>{
+  const {AIWorkspace}=await import('../web/components/AIWorkspace');let calls=0;let saved=0;
+  const c=data.competencies[0]!;const proposal={competencyId:c.id,minutes:30,method:'questions' as const,total:10,correct:null,notes:'Rever critérios',dateHint:null,warnings:[]};
+  render(<AIWorkspace data={data} onSave={async()=>{saved++;}} onSaved={async()=>{}} onClose={()=>{}} api={{status:async()=>({available:true,dailyLimit:10}),propose:async()=>{calls++;return{proposal,cached:false};}}}/>);
+  await waitFor(()=>assert(screen.getByLabelText('O que você quer organizar?')));
+  fireEvent.change(screen.getByLabelText('O que você quer organizar?'),{target:{value:'Fiz 10 questões em 30 minutos'}});
+  fireEvent.click(screen.getByRole('button',{name:'Preparar sugestão'}));await waitFor(()=>assert(screen.getByRole('region',{name:'Prévia da sugestão'})));
+  assert.equal(calls,1);assert.equal(saved,0);fireEvent.click(screen.getByRole('button',{name:'Revisar registro antes de salvar'}));
+  assert.equal((screen.getByLabelText('Acertos') as HTMLInputElement).value,'');
+  assert.equal((screen.getByLabelText('Como foi lembrar?') as HTMLSelectElement).value,'0');
+  fireEvent.change(screen.getByLabelText('Acertos'),{target:{value:'7'}});fireEvent.change(screen.getByLabelText('Como foi lembrar?'),{target:{value:'3'}});
+  fireEvent.click(screen.getByRole('button',{name:'Salvar e atualizar meu plano'}));await waitFor(()=>assert.equal(saved,1));
+});
+
+test('IA: recuperação só revela resposta após tentativa e não atualiza memória automaticamente',async()=>{
+  const {AIWorkspace}=await import('../web/components/AIWorkspace');let saved=false;
+  const quote='O ciclo inclui evaporação, condensação e precipitação, movendo a água entre a superfície e a atmosfera.';
+  render(<AIWorkspace data={data} onSave={async()=>{saved=true;}} onSaved={async()=>{}} onClose={()=>{}} api={{status:async()=>({available:true,dailyLimit:10}),propose:async()=>({proposal:{question:'Quais são as etapas?',answer:'Evaporação, condensação e precipitação.',sourceQuote:quote,warnings:[]},cached:false})}}/>);
+  await waitFor(()=>assert(screen.getByRole('button',{name:'Recuperação ativa'})));fireEvent.click(screen.getByRole('button',{name:'Recuperação ativa'}));
+  fireEvent.change(screen.getByLabelText('Trecho do seu material'),{target:{value:quote}});
+  const c=data.competencies[0]!;fireEvent.change(screen.getByLabelText('Buscar área, tema ou competência'),{target:{value:c.title}});fireEvent.click(screen.getByRole('button',{name:`${c.topic} · ${c.title} ${c.area}`}));
+  fireEvent.click(screen.getByRole('button',{name:'Preparar sugestão'}));await waitFor(()=>assert(screen.getByText('Quais são as etapas?')));
+  assert.equal((screen.getByRole('button',{name:'Comparar com o material'}) as HTMLButtonElement).disabled,true);
+  assert.equal(screen.queryByText('Evaporação, condensação e precipitação.'),null);fireEvent.change(screen.getByLabelText('Sua resposta sem consultar'),{target:{value:'Evaporação e condensação'}});
+  fireEvent.click(screen.getByRole('button',{name:'Comparar com o material'}));assert(screen.getByText(/Resposta sugerida/));assert.equal(saved,false);
+});

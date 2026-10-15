@@ -7,3 +7,5 @@ dist/
 supabase/.temp/
 supabase/functions/study-session/index.ts
 simulation/output/trace.json
+
+supabase/functions/study-ai/index.ts
