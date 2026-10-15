@@ -25,7 +25,7 @@ export function SessionForm({ competencies, initialId, minutes, method, onSave, 
     try {
       const endedAt=locked?new Date():new Date(Temporal.PlainDateTime.from(endedLocal).toZonedDateTime(timezone).epochMilliseconds);
       if(endedAt.getTime()>Date.now()+60000)throw new Error('O término não pode estar no futuro.');
-      if(total>0&&correct<0&&!['reading','priming'].includes(studyMethod))throw new Error('Informe quantas questões acertou.');
+      if(status!=='missed'&&total>0&&correct<0&&!['reading','priming'].includes(studyMethod))throw new Error('Informe quantas questões acertou.');
       if(!studyMethod)throw new Error('Escolha o método de estudo.');
       if(!selected)throw new Error('Escolha a competência que você estudou.');
       if (status!=='missed' && !['reading','priming'].includes(studyMethod) && (studyMethod!=='questions'||total>0) && !feedback) throw new Error('Informe como foi lembrar antes de salvar.');

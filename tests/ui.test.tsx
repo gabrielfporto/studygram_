@@ -291,3 +291,11 @@ test('IA: recuperação só revela resposta após tentativa e não atualiza mem�
   assert.equal(screen.queryByText('Evaporação, condensação e precipitação.'),null);fireEvent.change(screen.getByLabelText('Sua resposta sem consultar'),{target:{value:'Evaporação e condensação'}});
   fireEvent.click(screen.getByRole('button',{name:'Comparar com o material'}));assert(screen.getByText(/Resposta sugerida/));assert.equal(saved,false);
 });
+
+test('IA: corrigir a sugestão para não realizado não exige acertos nem cria evidência',async()=>{
+  let received:import('../src/application/session').SessionInput|null=null;
+  render(<SessionForm competencies={data.competencies} initialId={data.competencies[0]!.id} minutes={20} method="questions" prefill={{competencyId:data.competencies[0]!.id,minutes:30,method:'questions',total:10,correct:null,notes:'',dateHint:null,warnings:[]}} onClose={()=>{}} onSave={async s=>{received=s;}}/>);
+  fireEvent.change(screen.getByLabelText('Resultado'),{target:{value:'missed'}});fireEvent.click(screen.getByRole('button',{name:'Salvar e atualizar meu plano'}));
+  await waitFor(()=>assert(received));const result=received as unknown as import('../src/application/session').SessionInput;
+  assert.equal(result.actualMinutes,0);assert.equal(result.total,0);assert.equal(result.correct,0);
+});
