@@ -1,0 +1,77 @@
+import React from 'react';
+import { JSDOM } from 'jsdom';
+import test, { after, afterEach, mock } from 'node:test';
+import assert from 'node:assert/strict';
+import { fixtures, inputFor, START } from '../simulation/fixtures';
+import { planDay } from '../src/engine/planner';
+import type { StudyData } from '../web/lib/data';
+
+const dom = new JSDOM('<!doctype html><html><body></body></html>', { url:'http://localhost:5173/studygram_/' });
+Object.assign(globalThis, { window:dom.window, document:dom.window.document, HTMLElement:dom.window.HTMLElement,
+  HTMLDialogElement:dom.window.HTMLDialogElement, localStorage:dom.window.localStorage });
+Object.defineProperty(globalThis,'navigator',{value:dom.window.navigator,configurable:true});
+// Um browser real possui o ciclo de vida da aba; o teste deve liberar timers/canais.
+Object.defineProperty(globalThis,'BroadcastChannel',{value:undefined,configurable:true});
+dom.window.HTMLDialogElement.prototype.showModal=function(){this.open=true;};
+const { render, screen, fireEvent, cleanup, waitFor } = await import('@testing-library/react');
+const { Today } = await import('../web/components/Today');
+const { Settings } = await import('../web/components/Settings');
+const { Contents } = await import('../web/components/Contents');
+const { Progress } = await import('../web/components/Progress');
+const { SessionForm } = await import('../web/components/SessionForm');
+const { supabase } = await import('../web/lib/client');
+afterEach(()=>{cleanup();mock.restoreAll();});
+after(async()=>{await supabase.auth.dispose();dom.window.close();});
+const data:StudyData={profile:{goal:'Internato',timezone:'America/Bahia'},competencies:fixtures(),areas:[],topics:[],sessions:[],questions:[],rules:[],contexts:[],rotations:[]};
+
+test('Hoje: iniciar, explicar e recalcular acionam comportamentos reais do componente',()=>{
+  let started=''; let override:number|null=null;
+  render(<Today data={data} plan={planDay(inputFor(data.competencies,60))} spent={10} now={START} onStart={id=>{started=id;}}
+    onSettings={()=>{}} onContents={()=>{}} override={null} onOverride={value=>{override=value;}}/>);
+  fireEvent.click(screen.getByRole('button',{name:/Iniciar sessão/})); assert(started);
+  fireEvent.click(screen.getByRole('button',{name:'Por que agora?'})); assert(screen.getByText(/Prioridade:/));
+  fireEvent.change(screen.getByLabelText('Minutos disponíveis agora'),{target:{value:'20'}});
+  fireEvent.click(screen.getByRole('button',{name:'Recalcular'})); assert.equal(override,30);
+});
+test('Rotina: salva sete regras e não anuncia sucesso antes da resposta',async()=>{
+  const calls:unknown[][]=[];
+  mock.method(supabase,'rpc',(...args:unknown[])=>{calls.push(args);return Promise.resolve({data:null,error:null});});
+  let saved=false;
+  render(<Settings data={data} onSaved={async()=>{saved=true;}}/>);
+  fireEvent.change(screen.getByLabelText('Contexto atual'),{target:{value:'Emergência'}});
+  fireEvent.click(screen.getByRole('button',{name:/Salvar rotina/}));
+  await waitFor(()=>assert(saved));
+  assert.equal(calls[0]![0],'configure_study');
+  assert.equal((calls[0]![1] as {p_rules:unknown[]}).p_rules.length,7);
+  assert(screen.getByText('Rotina salva. Seu plano foi recalculado.'));
+});
+test('Conteúdos: busca, importação revisada e arquivamento preservam ações',async()=>{
+  const calls:unknown[][]=[];
+  mock.method(supabase,'rpc',(...args:unknown[])=>{calls.push(args);return Promise.resolve({data:'topic',error:null});});
+  let archived=''; mock.method(supabase,'from',()=>({update:()=>({eq:(_key:string,id:string)=>{archived=id;return Promise.resolve({error:null});}})}));
+  render(<Contents data={data} onSaved={async()=>{}}/>);
+  fireEvent.change(screen.getByLabelText('Buscar no seu conteúdo'),{target:{value:'Trombólise'}});
+  assert.equal(screen.getAllByRole('button',{name:/Arquivar /}).length,1);
+  fireEvent.click(screen.getByRole('button',{name:'Arquivar Trombólise'})); await waitFor(()=>assert(archived));
+  fireEvent.click(screen.getByRole('button',{name:'+ Adicionar tema'}));
+  fireEvent.change(screen.getByLabelText('Área'),{target:{value:'Clínica'}});
+  fireEvent.change(screen.getByLabelText('Tema'),{target:{value:'SCA'}});
+  fireEvent.change(screen.getByLabelText('Competências — uma por linha'),{target:{value:'ECG\nDiagnóstico\nECG'}});
+  fireEvent.click(screen.getByRole('button',{name:'Confirmar e adicionar'}));
+  await waitFor(()=>assert.equal(calls.length,1));
+  assert.deepEqual((calls[0]![1] as {p_titles:string[]}).p_titles,['ECG','Diagnóstico']);
+});
+test('Sessão: falha mantém formulário e a chave de idempotência para tentar novamente',async()=>{
+  const ids:string[]=[]; let closed=false;
+  render(<SessionForm competencies={data.competencies} initialId={data.competencies[0]!.id} minutes={20} method="recall"
+    onClose={()=>{closed=true;}} onSave={async input=>{ids.push(input.idempotencyKey); if(ids.length===1)throw new Error('Sem conexão');}}/>);
+  fireEvent.click(screen.getByRole('button',{name:'Salvar e atualizar meu plano'}));
+  await waitFor(()=>assert(screen.getByRole('alert'))); assert.equal(closed,false);
+  fireEvent.click(screen.getByRole('button',{name:'Salvar e atualizar meu plano'}));
+  await waitFor(()=>assert(closed)); assert.equal(ids[0],ids[1]);
+});
+test('Progresso: ausência de evidência não fabrica taxa de acerto',()=>{
+  render(<Progress data={{...data,competencies:[]}} now={START}/>);
+  assert(screen.getByText('Ainda sem evidência objetiva'));
+  assert(screen.getByText('Registre uma recuperação para começar'));
+});

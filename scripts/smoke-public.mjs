@@ -1,0 +1,11 @@
+import assert from 'node:assert/strict';
+const url = 'https://aksjxellsgshapbntoby.supabase.co';
+const key = 'sb_publishable_BSQi8IwlIIDMdLQGt5jTAQ_S3U_pKej';
+const edge = await fetch(`${url}/functions/v1/study-session`, { method:'POST', headers:{apikey:key,'Content-Type':'application/json'},body:'{}' });
+assert.equal(edge.status,401,'Função deve exigir sessão autenticada');
+const table = await fetch(`${url}/rest/v1/study_sessions?select=id&limit=1`,{headers:{apikey:key}});
+assert([401,403].includes(table.status),'Dados de estudo devem estar bloqueados sem login');
+const options = await fetch(`${url}/functions/v1/study-session`, {method:'OPTIONS',headers:{origin:'https://gabrielfporto.github.io'}});
+assert.equal(options.status,204);
+assert.equal(options.headers.get('access-control-allow-origin'),'https://gabrielfporto.github.io');
+console.log('Supabase remoto: sessão obrigatória, leitura anônima bloqueada e CORS do Pages válido.');

@@ -1,0 +1,44 @@
+import { useEffect, useRef, useState, type FormEvent } from 'react';
+import type { Competency } from '../../src/domain/model';
+import type { SessionInput } from '../../src/application/session';
+
+export function SessionForm({ competencies, initialId, minutes, method, onSave, onClose }: {
+  competencies: Competency[]; initialId: string; minutes: number; method: SessionInput['method'];
+  onSave: (input: SessionInput) => Promise<void>; onClose: () => void;
+}) {
+  const dialog = useRef<HTMLDialogElement>(null);
+  const [id] = useState(() => crypto.randomUUID());
+  const [selected, setSelected] = useState(initialId);
+  const [duration, setDuration] = useState(minutes);
+  const [studyMethod, setMethod] = useState(method);
+  const [status, setStatus] = useState<SessionInput['status']>('completed');
+  const [feedback, setFeedback] = useState(3); const [total, setTotal] = useState(0); const [correct, setCorrect] = useState(0);
+  const [notes, setNotes] = useState(''); const [error, setError] = useState(''); const [busy, setBusy] = useState(false);
+  useEffect(() => { dialog.current?.showModal(); }, []);
+  async function submit(e: FormEvent) {
+    e.preventDefault(); setBusy(true); setError('');
+    const endedAt = new Date(); const actual = status === 'missed' ? 0 : duration;
+    try {
+      await onSave({ competencyId: selected, idempotencyKey: id, actualMinutes: actual, plannedMinutes: minutes,
+        startedAt: new Date(endedAt.getTime() - actual * 60000).toISOString(), endedAt: endedAt.toISOString(),
+        method: studyMethod, status, feedback, total: status === 'missed' || studyMethod === 'reading' ? 0 : total,
+        correct: status === 'missed' || studyMethod === 'reading' ? 0 : correct, notes });
+      onClose();
+    } catch (err) { setError(err instanceof Error ? err.message : 'Não foi possível salvar. Tente novamente.'); }
+    finally { setBusy(false); }
+  }
+  return <dialog ref={dialog} onCancel={e => { if (busy) e.preventDefault(); else onClose(); }} aria-labelledby="session-title">
+    <div className="dialog-head"><div><p className="eyebrow">REGISTRAR PRÁTICA</p><h2 id="session-title">Como foi o estudo?</h2></div><button disabled={busy} className="secondary" onClick={onClose}>Fechar</button></div>
+    <p className="muted">Estude no seu material e registre o resultado aqui. Não é necessário manter esta janela aberta.</p>
+    <form onSubmit={submit}><label>Competência<select value={selected} onChange={e => setSelected(e.target.value)}>{competencies.filter(c => !c.archived).map(c => <option value={c.id} key={c.id}>{c.topic} · {c.title}</option>)}</select></label>
+      <div className="form-grid"><label>Resultado<select value={status} onChange={e => setStatus(e.target.value as typeof status)}><option value="completed">Concluído</option><option value="partial">Parcial</option><option value="missed">Não realizado</option></select></label>
+      <label>Tempo real (min)<input type="number" min={1} max={720} required disabled={status === 'missed'} value={duration} onChange={e => setDuration(Number(e.target.value))}/></label></div>
+      <label>Método<select value={studyMethod} onChange={e => setMethod(e.target.value as typeof studyMethod)}><option value="new">Conteúdo novo + recuperação</option><option value="reading">Leitura / aula</option><option value="recall">Recuperação ativa</option><option value="questions">Questões</option><option value="case">Caso clínico</option><option value="explanation">Explicação sem consulta</option></select></label>
+      {status !== 'missed' && studyMethod !== 'reading' && <><div className="form-grid"><label>Questões / tentativas<input type="number" min={0} max={1000} value={total} onChange={e => setTotal(Number(e.target.value))}/></label><label>Acertos<input type="number" min={0} max={total} value={correct} onChange={e => setCorrect(Number(e.target.value))}/></label></div>
+        <label>Como foi lembrar?<select value={feedback} onChange={e => setFeedback(Number(e.target.value))}><option value={1}>Não lembrei</option><option value={2}>Lembrei parcialmente</option><option value={3}>Lembrei</option><option value={4}>Foi fácil</option></select></label></>}
+      {studyMethod === 'reading' && <p className="caption">Leitura registra tempo; a memória só é atualizada com recuperação ativa.</p>}
+      <label>Observação (opcional)<textarea maxLength={4000} rows={2} value={notes} onChange={e => setNotes(e.target.value)}/></label>
+      {error && <p className="notice error" role="alert">{error}</p>}
+      <button disabled={busy} className="primary full">{busy ? 'Salvando…' : 'Salvar e atualizar meu plano'}</button>
+    </form></dialog>;
+}

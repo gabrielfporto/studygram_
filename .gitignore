@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.env
+.env.*
+!.env.example
+.expo/
+supabase/.temp/
+supabase/functions/study-session/index.ts
+simulation/output/trace.json
