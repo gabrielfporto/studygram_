@@ -154,6 +154,13 @@ test('Migrations: PostgreSQL, RLS entre dois usuários, grants e FKs compostas',
     assert.equal(retry.rows[0]!.commit_study_session.duplicate,true);
     await assert.rejects(db.query('select commit_study_session($1,$2::jsonb,$3,$4::jsonb)',[a,JSON.stringify({...input,idempotencyKey:id(91)}),1,JSON.stringify(memory)]),/REVISION_CONFLICT/);
     const count=await db.query<{count:number}>(`select count(*)::int as count from study_sessions where user_id='${a}'`); assert.equal(count.rows[0]!.count,2);
+    const beforePriming=await db.query<{revision:number}>('select revision from reviews where competency_id=$1',[id(3)]);
+    await db.query('select commit_study_session($1,$2::jsonb,$3,$4::jsonb)',[a,JSON.stringify({...input,idempotencyKey:id(92),method:'priming',actualMinutes:5,total:0,correct:0,notes:'Preparar uma pergunta'}),2,null]);
+    const afterPriming=await db.query<{revision:number}>('select revision from reviews where competency_id=$1',[id(3)]);assert.deepEqual(beforePriming.rows,afterPriming.rows);
+    await db.exec(`reset role;set role authenticated;select set_config('request.jwt.claim.sub','${a}',false);`);
+    await db.query('update competencies set resource_url=$1 where id=$2',['https://www.notion.so/material',id(3)]);
+    await assert.rejects(db.query('update competencies set resource_url=$1 where id=$2',['javascript:alert(1)',id(3)]),/check constraint/);
+    assert.equal((await db.query<{resource_url:string}>('select resource_url from competencies where id=$1',[id(3)])).rows[0]!.resource_url,'https://www.notion.so/material');
     await db.exec(`reset role; delete from auth.users where id = '${a}';`);
     for (const { tablename } of tables) {
       const remaining = (await db.query<{ user_id: string }>(`select user_id from ${tablename}`)).rows;

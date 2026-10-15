@@ -18,7 +18,7 @@ Até 1.000 assuntos / 2 MB por lote. O leitor aceita vírgula, ponto e vírgula,
 
 Na redistribuição adaptativa, todos os assuntos importados ficam elegíveis imediatamente. Se a data inicial for preservada, assuntos futuros entram no plano a partir daquele dia no fuso configurado; datas passadas não se acumulam como tarefas obrigatórias. Após uma sessão não marcada como ausência, o acompanhamento usa o histórico do app. Não há garantia de encaixar todos os assuntos na data original: a disponibilidade continua sendo respeitada.
 
-Estudo, Questões ou Retrieval marcados habilitam uma primeira recuperação, sem criar sessão, acertos, domínio ou cartão FSRS artificial. Priming sozinho não indica estudo concluído. O status fica como texto de histórico. Uma recuperação registrada no Studygram inicia a estimativa de memória.
+As etapas marcadas orientam o ciclo de estudo: a teoria já concluída libera recuperação, e as demais etapas preenchidas evitam repetir o que já foi feito. A importação não cria sessão, acertos, domínio ou cartão FSRS artificial. Priming sozinho não indica teoria concluída. O status fica como texto de histórico. Uma recuperação registrada no Studygram inicia a estimativa de memória.
 
 A prévia permite desmarcar linhas. Linhas inválidas e duplicadas ficam de fora. Corrija os erros no arquivo e importe depois. Duplicatas são identificadas por Área + Tema + Assunto, ignorando caixa, acentos e espaços repetidos, inclusive itens arquivados. O backend repete a conferência sob RLS e trava por usuário: o lote é atômico e uma tentativa repetida não duplica conteúdos. A importação adiciona assuntos; mudanças no CSV não substituem registros existentes. Não há sincronização contínua com o Notion.
 

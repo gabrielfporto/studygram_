@@ -2,15 +2,17 @@ import { z } from 'zod';
 import { DAY, MINUTE, contextSchema, validateCompetency, type Busy, type Competency, type Context, type Effort, type Window } from '../domain/model.js';
 import { availability } from './availability.js';
 import { priority, type Priority, type Weights, ENGINE_VERSION } from './priority.js';
+import { nextStudyStep, type StudyMethod } from './study-cycle.js';
 
 export interface PlanInput extends Context {
   userId: string; competencies: Competency[]; windows: Window[]; busy: Busy[];
   dailyMinutes: number; spentMinutes: number; weeklyRemainingMinutes: number;
   minimumSession: number; maximumSessions: number; maxEffort: Effort;
   completedIds: string[]; weights?: Weights;
+  useStudyCycle?: boolean; startSmall?: boolean;
 }
 export interface Activity {
-  competencyId: string; method: 'new' | 'recall' | 'questions'; minutes: number;
+  competencyId: string; method: StudyMethod; minutes: number;
   utility: number; expectedValuePerMinute: number; priority: Priority;
 }
 export interface PlanItem extends Activity { start: number; end: number }
@@ -26,11 +28,18 @@ const limitsSchema = z.object({
 });
 const rank = { low: 0, medium: 1, high: 2 };
 
-function alternatives(c: Competency, p: Priority, maxEffort: Effort, minimum: number): Activity[] {
+function alternatives(c: Competency, p: Priority, maxEffort: Effort, minimum: number, input: PlanInput): Activity[] {
   const make = (minutes: number, method: Activity['method'], gain: number): Activity => ({
     competencyId: c.id, method, minutes, priority: p, utility: p.score * gain,
     expectedValuePerMinute: p.score * gain / minutes,
   });
+  if (input.useStudyCycle) {
+    const step = nextStudyStep(c,input.now);
+    if (!step.ready || (!input.startSmall && rank[step.effort] > rank[maxEffort])) return [];
+    const minutes = input.startSmall ? 5 : step.minutes;
+    const gain = step.method==='priming' ? .15 : step.method==='reading' ? 1.4 : 1;
+    return minutes >= minimum ? [make(minutes,step.method,gain)] : [];
+  }
   const importedStudy = c.notionSource && (c.notionSource.studied || c.notionSource.questions || c.notionSource.retrieval);
   if (!c.card.reps && !importedStudy) return maxEffort === 'high' ? [make(c.newMinutes, 'new', 1.4)].filter(a => a.minutes >= minimum) : [];
   const result: Activity[] = [];
@@ -73,7 +82,7 @@ export function planDay(input: PlanInput): Plan {
   const capacityMinutes = Math.max(0, Math.min(freeMinutes, input.dailyMinutes - input.spentMinutes, input.weeklyRemainingMinutes));
   const done = new Set(input.completedIds);
   const candidates = competencies.filter(c => !c.archived && !done.has(c.id)).sort((a, b) => a.id < b.id ? -1 : 1);
-  const groups = new Map(candidates.map(c => [c.id, alternatives(c, priority(c, input, input.weights), input.maxEffort, input.minimumSession)]));
+  const groups = new Map(candidates.map(c => [c.id, alternatives(c, priority(c, input, input.weights), input.maxEffort, input.minimumSession,input)]));
   const items: PlanItem[] = [];
   let remaining = capacityMinutes;
   for (const window of freeWindows) {
@@ -87,7 +96,7 @@ export function planDay(input: PlanInput): Plan {
       groups.delete(activity.competencyId);
     }
   }
-  return { version: ENGINE_VERSION, capacityMinutes, plannedMinutes: capacityMinutes - remaining, freeWindows, items,
+  return { version: ENGINE_VERSION+(input.useStudyCycle?'/cycle-1':''), capacityMinutes, plannedMinutes: capacityMinutes - remaining, freeWindows, items,
     deferred: [...groups].map(([competencyId, options]) => ({ competencyId,
       reason: options.length ? 'Menor valor dentro da capacidade e dos limites de hoje' : 'Esforço ou duração incompatível com a disponibilidade' })) };
 }

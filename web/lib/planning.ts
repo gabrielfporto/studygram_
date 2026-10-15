@@ -20,12 +20,15 @@ export function makePlan(data: StudyData, userId: string, now: Date, override: n
   const midnight = date.add({ days: 1 }).toZonedDateTime(timezone).epochMilliseconds;
   const windows = override === null ? rules.map(r => ({ start: dayWindow(date, r.starts_local, timezone), end: dayWindow(date, r.ends_local, timezone) }))
     : override > spent ? [{ start: now.getTime(), end: Math.min(midnight, now.getTime() + (override - spent) * MINUTE) }] : [];
-  const completedIds = todaySessions.map(s => s.competency_id); // ausência também libera o dia para outras escolhas
+  // Etapas concluídas liberam a próxima etapa, inclusive no mesmo dia.
+  // Uma ausência deixa espaço para outro assunto hoje.
+  const completedIds = todaySessions.filter(s=>s.status==='missed').map(s => s.competency_id);
   // A data do Notion só define a primeira elegibilidade. Depois de uma sessão real,
   // o histórico e o FSRS passam a conduzir a programação.
   const eligible = data.competencies.filter(c => !c.notionSource?.preserveDate || !c.notionSource.nextStudy ||
     data.sessions.some(s => s.competency_id === c.id && s.status !== 'missed') || c.notionSource.nextStudy <= date.toString());
   return { spent, todaySessions, plan: planDay({ userId, now, competencies: eligible, windows, busy: [],
-    dailyMinutes, spentMinutes: spent, weeklyRemainingMinutes: 7 * 720, minimumSession: 10, maximumSessions: 6,
+    dailyMinutes, spentMinutes: spent, weeklyRemainingMinutes: 7 * 720, minimumSession: 5, maximumSessions: 6,
+    useStudyCycle:true, startSmall:override!==null && override-spent<=5,
     maxEffort: rules[0]?.max_effort ?? 'high', completedIds, rotations: data.rotations, exams: [] }) };
 }

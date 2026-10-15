@@ -111,9 +111,9 @@ Selecionado: 180 min em 6 sessões.
 
 | Tema / competência | Método | Min | Score | Valor/min | Motivos |
 |---|---|---:|---:|---:|---|
-| DM2 / Manejo inicial | new | 40 | 45.0 | 1.57 | Competência ainda não estudada; Dificuldade e erros recentes; Relevante para o contexto atual |
-| Hipotireoidismo / Manejo inicial | new | 40 | 45.0 | 1.57 | Competência ainda não estudada; Dificuldade e erros recentes; Relevante para o contexto atual |
-| Obesidade / Manejo inicial | new | 40 | 45.0 | 1.57 | Competência ainda não estudada; Dificuldade e erros recentes; Relevante para o contexto atual |
+| DM2 / Manejo inicial | new | 40 | 45.0 | 1.57 | Memória ainda não avaliada; Dificuldade e erros recentes; Relevante para o contexto atual |
+| Hipotireoidismo / Manejo inicial | new | 40 | 45.0 | 1.57 | Memória ainda não avaliada; Dificuldade e erros recentes; Relevante para o contexto atual |
+| Obesidade / Manejo inicial | new | 40 | 45.0 | 1.57 | Memória ainda não avaliada; Dificuldade e erros recentes; Relevante para o contexto atual |
 | Osteoporose / Reconhecimento | questions | 20 | 44.2 | 2.21 | Relevante para o contexto atual; Alta importância |
 | HAS / Reconhecimento | questions | 20 | 43.9 | 2.20 | Relevante para o contexto atual; Alta importância |
 | DM2 / Reconhecimento | questions | 20 | 43.5 | 2.17 | Relevante para o contexto atual; Alta importância |

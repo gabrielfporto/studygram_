@@ -11,6 +11,9 @@ import { Settings } from './components/Settings';
 import { Contents } from './components/Contents';
 import { Progress } from './components/Progress';
 import { SessionForm } from './components/SessionForm';
+import { GuidedSession } from './components/GuidedSession';
+import { readDraft, storeDraft, type StudyDraft } from './lib/active-study';
+import type { StudyMethod } from '../src/engine/study-cycle';
 
 const tabs = ['Hoje','Plano','Conteúdos','Progresso'] as const;
 type Tab = typeof tabs[number];
@@ -21,6 +24,13 @@ export function App() {
   const [now,setNow] = useState(new Date()); const [override,setOverride] = useState<number|null>(null);
   const [refresh,setRefresh] = useState(0); const [loading,setLoading] = useState(false);
   const [active,setActive] = useState<{ id: string; minutes: number; method: SessionInput['method'] }|null>(null);
+  const [guided,setGuided]=useState<StudyDraft|null>(null); const [showGuided,setShowGuided]=useState(false);
+  useEffect(()=>{setGuided(session?.user.id?readDraft(session.user.id):null);setShowGuided(false);},[session?.user.id]);
+  function updateGuided(draft:StudyDraft|null) { if(!session)return;storeDraft(session.user.id,draft);setGuided(draft);if(!draft)setShowGuided(false); }
+  function startGuided(id:string,minutes:number,method:StudyMethod,small=false) {
+    if(!guided) updateGuided({id:crypto.randomUUID(),competencyId:id,minutes,method,small,startedAt:new Date().toISOString(),pausedAt:null,pausedMs:0});
+    setShowGuided(true);
+  }
   useEffect(() => {
     let alive = true;
     supabase.auth.getSession().then(({ data, error }) => { if (alive) { setSession(data.session); setAuthReady(true); if(error) setError('Falha ao recuperar sua sessão.'); } });
@@ -57,10 +67,13 @@ export function App() {
   if(!authReady) return <main className="loading" role="status">Abrindo seu espaço…</main>;
   if(!session || recovery) return <Auth recovery={recovery} onRecovered={()=>setRecovery(false)}/>;
   const summary = data ? makePlan(data,session.user.id,now,override) : null;
+  const guidedCompetency=data?.competencies.find(c=>c.id===guided?.competencyId && !c.archived);
   return <div className="app-shell"><a className="skip-link" href="#main">Ir para o conteúdo</a><aside className="sidebar"><a className="brand" href={import.meta.env.BASE_URL}><span className="brand-mark">s</span>studygram</a><p className="eyebrow nav-label">SEU ESPAÇO</p><nav aria-label="Navegação principal">{tabs.map((t,i)=><button key={t} aria-current={tab===t ? 'page' : undefined} className={tab===t ? 'nav-item active' : 'nav-item'} onClick={()=>{setTab(t);setNotice('');}}><span aria-hidden="true">{['◉','▤','▧','↗'][i]}</span>{t}</button>)}</nav><div className="sidebar-footer"><p className="caption">Um passo por vez.</p><p className="user-email">{session.user.email}</p><button className="text-button" onClick={async()=>{const {error}=await supabase.auth.signOut(); if(error)setError('Não foi possível sair. Tente novamente.');}}>Sair da conta</button></div></aside>
-    <main id="main" className="main"><div className="topbar"><span className="caption">APRENDIZADO COM INTENÇÃO</span>{data?.competencies.some(c=>!c.archived) && <button className="secondary" onClick={()=>setActive({id:data.competencies.find(c=>!c.archived)!.id,minutes:20,method:'reading'})}>+ Registrar estudo</button>}</div>
+    <main id="main" className="main"><div className="topbar"><span className="caption">APRENDIZADO COM INTENÇÃO</span>{data?.competencies.some(c=>!c.archived) && <button disabled={!!guided} className="secondary" onClick={()=>setActive({id:data.competencies.find(c=>!c.archived)!.id,minutes:20,method:'reading'})}>+ Registrar estudo</button>}</div>
+      {guided && data && <div className="active-study notice"><div><strong>{guidedCompetency?`Sessão em andamento · ${guidedCompetency.title}`:'O assunto da sessão foi arquivado ou não está disponível.'}</strong><p>Seu próximo passo já está escolhido.</p></div>{guidedCompetency?<button className="primary" onClick={()=>setShowGuided(true)}>Continuar sessão →</button>:<button className="secondary" onClick={()=>updateGuided(null)}>Encerrar sem registrar</button>}</div>}
       {notice && <p role="status" className="notice">{notice}</p>}{error && <div role="alert" className="notice error">{error}<button className="text-button" onClick={()=>void reload()}>Tentar novamente</button></div>}
       {loading && <p className="loading" role="status">Organizando seus estudos…</p>}
-      {data && summary && <>{tab==='Hoje' && <Today data={data} plan={summary.plan} spent={summary.spent} now={now} onStart={(id,minutes,method)=>setActive({id,minutes,method})} onSettings={()=>setTab('Plano')} onContents={()=>setTab('Conteúdos')} override={override} onOverride={setOverride}/>}{tab==='Plano' && <Settings data={data} onSaved={reload}/>}{tab==='Conteúdos' && <Contents data={data} onSaved={reload}/>}{tab==='Progresso' && <Progress data={data} now={now}/>}</>}
-    </main>{active && data && <SessionForm competencies={data.competencies} initialId={active.id} minutes={active.minutes} method={active.method} onSave={save} onClose={()=>setActive(null)}/>}</div>;
+      {data && summary && <>{tab==='Hoje' && <Today data={data} plan={summary.plan} spent={summary.spent} now={now} onStart={startGuided} onSettings={()=>setTab('Plano')} onContents={()=>setTab('Conteúdos')} override={override} onOverride={setOverride}/>}{tab==='Plano' && <Settings data={data} onSaved={reload}/>}{tab==='Conteúdos' && <Contents data={data} onSaved={reload}/>}{tab==='Progresso' && <Progress data={data} now={now}/>}</>}
+    </main>{active && data && <SessionForm competencies={data.competencies} initialId={active.id} minutes={active.minutes} method={active.method} onSave={save} onClose={()=>setActive(null)}/>}
+    {guided && guidedCompetency && showGuided && <GuidedSession draft={guided} competency={guidedCompetency} onChange={updateGuided} onHide={()=>setShowGuided(false)} onDiscard={()=>updateGuided(null)} onSave={async input=>{await save(input);updateGuided(null);}}/>}</div>;
 }

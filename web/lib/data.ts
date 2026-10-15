@@ -3,13 +3,14 @@ import { supabase } from './client';
 import { newMemory } from '../../src/engine/memory';
 import { deserializeCard } from '../../src/application/session';
 import { validateCompetency, notionSourceSchema } from '../../src/domain/model';
+import { stagesFromSessions } from '../../src/engine/study-cycle';
 
 const named = z.object({ id: z.string(), title: z.string() });
 const competency = named.extend({ topic_id: z.string(), importance: z.coerce.number(), manual_priority: z.coerce.number(),
-  new_minutes: z.number(), review_minutes: z.number(), effort: z.enum(['low','medium','high']), archived: z.boolean(), notion_source: notionSourceSchema.nullable().optional() });
-const question = z.object({ competency_id: z.string(), total: z.number(), correct: z.number(), occurred_at: z.string() });
+  new_minutes: z.number(), review_minutes: z.number(), effort: z.enum(['low','medium','high']), archived: z.boolean(), notion_source: notionSourceSchema.nullable().optional(), resource_url:z.string().nullable().optional() });
+const question = z.object({ competency_id: z.string(), total: z.number(), correct: z.number(), occurred_at: z.string(), session_id:z.string().nullable().optional() });
 const session = z.object({ id: z.string(), competency_id: z.string(), actual_minutes: z.number(), started_at: z.string(), ended_at: z.string().nullable(),
-  status: z.string(), method: z.string(), feedback: z.number().nullable() });
+  status: z.string(), method: z.string(), feedback: z.number().nullable(), notes:z.string().nullable().optional() });
 export const ruleSchema = z.object({ weekday: z.number(), starts_local: z.string(), ends_local: z.string(), daily_cap_minutes: z.number(),
   minimum_session_minutes: z.number(), max_effort: z.enum(['low','medium','high']) });
 export type Rule = z.infer<typeof ruleSchema>;
@@ -45,13 +46,16 @@ export async function loadData(userId: string) {
     const ev = questions.filter(q => q.competency_id === c.id).map(q => ({ at: new Date(q.occurred_at), total: q.total, correct: q.correct,
       errors: q.total - q.correct, recurringErrors: 0, reportedDifficulty: 0.5 }));
     // Feedback de recuperação também conta quando não houve questões.
-    for (const s of sessions.filter(s => s.competency_id === c.id && s.feedback !== null && s.status !== 'missed' && s.method !== 'reading')) {
+    for (const s of sessions.filter(s => s.competency_id === c.id && s.feedback !== null && s.status !== 'missed' && !['reading','priming'].includes(s.method)
+      && (s.method!=='questions'||questions.some(q=>q.session_id===s.id && q.total>0)))) {
       ev.push({ at: new Date(s.ended_at ?? s.started_at), total: 0, correct: 0, errors: 0, recurringErrors: 0, reportedDifficulty: (4 - s.feedback!) / 3 });
     }
     return validateCompetency({ id: c.id, userId, topicId: c.topic_id, area: area?.title ?? 'Área', topic: topic?.title ?? 'Tema', title: c.title,
       contextIds: (links.data ?? []).filter(l => l.competency_id === c.id).map(l => l.context_id), importance: c.importance,
       manualPriority: c.manual_priority, newMinutes: c.new_minutes, reviewMinutes: c.review_minutes, effort: c.effort,
-      archived: c.archived, notionSource: c.notion_source ?? null, card: review ? deserializeCard(review.card) : newMemory(now), evidence: ev });
+      archived: c.archived, notionSource: c.notion_source ?? null, materialUrl:c.resource_url ?? null,
+      completedStages:stagesFromSessions(sessions.filter(s=>s.competency_id===c.id),questions),
+      card: review ? deserializeCard(review.card) : newMemory(now), evidence: ev.sort((a,b)=>a.at.getTime()-b.at.getTime()) });
   });
   return { profile: safeProfile, areas, topics, competencies: models, sessions, questions, rules, contexts,
     rotations: rotations.map(r => ({ contextId: r.context_id, start: new Date(r.starts_at), end: new Date(r.ends_at) })) };
