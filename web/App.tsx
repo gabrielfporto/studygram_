@@ -14,6 +14,7 @@ import { SessionForm } from './components/SessionForm';
 import { GuidedSession } from './components/GuidedSession';
 import { readDraft, storeDraft, type StudyDraft } from './lib/active-study';
 import type { StudyMethod } from '../src/engine/study-cycle';
+import { clearGoogleSession } from './lib/google-calendar';
 
 const tabs = ['Hoje','Plano','Conteúdos','Progresso'] as const;
 type Tab = typeof tabs[number];
@@ -25,7 +26,7 @@ export function App() {
   const [refresh,setRefresh] = useState(0); const [loading,setLoading] = useState(false);
   const [active,setActive] = useState<{ id: string; minutes: number; method: SessionInput['method'] }|null>(null);
   const [guided,setGuided]=useState<StudyDraft|null>(null); const [showGuided,setShowGuided]=useState(false);
-  useEffect(()=>{setGuided(session?.user.id?readDraft(session.user.id):null);setShowGuided(false);},[session?.user.id]);
+  useEffect(()=>{setData(null);clearGoogleSession();setGuided(session?.user.id?readDraft(session.user.id):null);setShowGuided(false);},[session?.user.id]);
   function updateGuided(draft:StudyDraft|null) { if(!session)return;storeDraft(session.user.id,draft);setGuided(draft);if(!draft)setShowGuided(false); }
   function startGuided(id:string,minutes:number,method:StudyMethod,small=false) {
     if(!guided) updateGuided({id:crypto.randomUUID(),competencyId:id,minutes,method,small,startedAt:new Date().toISOString(),pausedAt:null,pausedMs:0});
@@ -42,7 +43,7 @@ export function App() {
   }, []);
   useEffect(() => { const timer=setInterval(()=>setNow(new Date()),60000); return ()=>clearInterval(timer); },[]);
   useEffect(() => {
-    let alive = true; setData(null);
+    let alive = true;
     if (!session?.user.id) return;
     setLoading(true); setError('');
     loadData(session.user.id).then(value=>{ if(alive) setData(value); }).catch(()=>{ if(alive) setError('Não foi possível carregar seus estudos. Verifique sua conexão e tente novamente.'); }).finally(()=>{ if(alive) setLoading(false); });

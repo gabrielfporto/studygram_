@@ -14,6 +14,8 @@ const session = z.object({ id: z.string(), competency_id: z.string(), actual_min
 export const ruleSchema = z.object({ weekday: z.number(), starts_local: z.string(), ends_local: z.string(), daily_cap_minutes: z.number(),
   minimum_session_minutes: z.number(), max_effort: z.enum(['low','medium','high']) });
 export type Rule = z.infer<typeof ruleSchema>;
+const connection=z.object({id:z.string(),external_calendar_id:z.string(),display_name:z.string().nullable().optional(),status:z.enum(['connected','expired','disconnected']),last_synced_at:z.string().nullable(),sync_range_start:z.string().nullable().optional(),sync_range_end:z.string().nullable().optional()});
+const calendarEvent=z.object({id:z.string(),connection_id:z.string(),starts_at:z.string(),ends_at:z.string(),status:z.enum(['busy','free','cancelled'])});
 async function rows<T>(table: string, userId: string, schema: z.ZodType<T>): Promise<T[]> {
   const result: T[] = [];
   for (let offset = 0; ; offset += 500) {
@@ -26,13 +28,14 @@ async function rows<T>(table: string, userId: string, schema: z.ZodType<T>): Pro
   return result;
 }
 export async function loadData(userId: string) {
-  const [areas, topics, competencies, reviews, questions, sessions, rules, contexts, rotations, links] = await Promise.all([
+  const [areas, topics, competencies, reviews, questions, sessions, rules, contexts, rotations, links, connections, calendarEvents] = await Promise.all([
     rows('study_areas', userId, named), rows('topics', userId, named.extend({ area_id: z.string() })), rows('competencies', userId, competency),
     rows('reviews', userId, z.object({ competency_id: z.string(), card: z.record(z.string(), z.unknown()) })),
     rows('question_sessions', userId, question), rows('study_sessions', userId, session), rows('availability_rules', userId, ruleSchema),
     rows('academic_contexts', userId, named), rows('rotations', userId, z.object({ context_id: z.string(), starts_at: z.string(), ends_at: z.string() })),
     // Tabela de ligação não tem id, por isso consulta própria com chave composta ordenada.
     supabase.from('competency_contexts').select('competency_id,context_id').eq('user_id', userId).order('competency_id').limit(10000),
+    rows('calendar_connections',userId,connection),rows('calendar_events',userId,calendarEvent),
   ]);
   if (links.error) throw links.error;
   const { data: profile, error } = await supabase.from('profiles').select('goal,timezone').eq('user_id', userId).maybeSingle();
@@ -57,7 +60,8 @@ export async function loadData(userId: string) {
       completedStages:stagesFromSessions(sessions.filter(s=>s.competency_id===c.id),questions),
       card: review ? deserializeCard(review.card) : newMemory(now), evidence: ev.sort((a,b)=>a.at.getTime()-b.at.getTime()) });
   });
-  return { profile: safeProfile, areas, topics, competencies: models, sessions, questions, rules, contexts,
+  return { userId,calendar:{connections,events:calendarEvents},profile: safeProfile, areas, topics, competencies: models, sessions, questions, rules, contexts,
     rotations: rotations.map(r => ({ contextId: r.context_id, start: new Date(r.starts_at), end: new Date(r.ends_at) })) };
 }
-export type StudyData = Awaited<ReturnType<typeof loadData>>;
+type LoadedData=Awaited<ReturnType<typeof loadData>>;
+export type StudyData = Omit<LoadedData,'calendar'|'userId'> & Partial<Pick<LoadedData,'calendar'|'userId'>>;

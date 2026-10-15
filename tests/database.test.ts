@@ -75,7 +75,7 @@ test('Migrations: PostgreSQL, RLS entre dois usuários, grants e FKs compostas',
       assert.equal(rows.length, 1, tablename);
       assert.equal(rows[0]!.user_id, a, tablename);
     }
-    const editable = ['profiles','study_areas','topics','competencies','academic_contexts','competency_contexts','rotations','exams','exam_competencies','availability_rules'];
+    const editable = ['profiles','study_areas','topics','competencies','academic_contexts','competency_contexts','rotations','exams','exam_competencies','availability_rules','calendar_connections','calendar_events'];
     for (const table of editable) {
       const ownUpdate = await db.query(`update ${table} set user_id = user_id where user_id = '${a}' returning user_id`);
       assert.equal(ownUpdate.rows.length, 1, `${table}: update próprio`);
@@ -118,6 +118,20 @@ test('Migrations: PostgreSQL, RLS entre dois usuários, grants e FKs compostas',
     assert.equal(imported.rows.length,1);
     await assert.rejects(db.query('select configure_study($1,$2,$3,$4::jsonb)', ['Erro','Fuso/Invalido','MFC',JSON.stringify(rules)]));
     const saved = await db.query<{goal:string}>('select goal from profiles'); assert.equal(saved.rows[0]!.goal,'Internato');
+    const snapshot={from:'2026-10-15T00:00:00Z',to:'2026-10-29T00:00:00Z',calendars:[{id:'primary',name:'Minha agenda'}],busy:[{calendarId:'primary',start:'2026-10-15T18:00:00Z',end:'2026-10-15T19:00:00Z'}]};
+    const saveCalendar=(value:unknown)=>db.query('select save_calendar_snapshot($1::jsonb)',[JSON.stringify(value)]);
+    await saveCalendar(snapshot);await saveCalendar(snapshot);
+    const slots=await db.query<{title:null;status:string}>('select title,status from calendar_events');assert.deepEqual(slots.rows,[{title:null,status:'busy'}]);
+    await assert.rejects(saveCalendar({...snapshot,busy:[{...snapshot.busy[0],end:'2026-10-15T17:00:00Z'}]}));
+    assert.equal((await db.query('select * from calendar_events')).rows.length,1);
+    await assert.rejects(saveCalendar({...snapshot,busy:[{...snapshot.busy[0],calendarId:'not-selected'}]}));
+    await saveCalendar({...snapshot,busy:[]});assert.equal((await db.query('select * from calendar_events')).rows.length,0);
+    await saveCalendar(snapshot);await db.exec('select disconnect_calendar()');assert.equal((await db.query('select * from calendar_events')).rows.length,0);
+    assert.equal((await db.query("select * from calendar_connections where status='connected'")).rows.length,0);
+    await db.exec(`reset role;set role authenticated;select set_config('request.jwt.claim.sub','${b}',false);`);
+    assert.equal((await db.query('select * from calendar_events')).rows.length,1,'Desconectar A não apaga agenda B');
+    await db.exec('reset role;set role anon;');await assert.rejects(saveCalendar(snapshot),/permission denied/);await assert.rejects(db.exec('select disconnect_calendar()'),/permission denied/);
+    await db.exec(`reset role;set role authenticated;select set_config('request.jwt.claim.sub','${a}',false);`);
     const row = {area:'MFC',topic:'Infectologia',title:'Hanseníase',importance:.95,
       source:{status:'Iniciado',nextStudy:'2026-10-06',priming:true,studied:true,questions:false,retrieval:false,rotation:'MFC, MFC',originalImportance:'Alta',preserveDate:true}};
     const importBatch = (items:unknown[]) => db.query<{import_schedule:{inserted:number;skipped:number}}>('select import_schedule($1::jsonb)',[JSON.stringify(items)]);

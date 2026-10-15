@@ -27,7 +27,9 @@ export function makePlan(data: StudyData, userId: string, now: Date, override: n
   // o histórico e o FSRS passam a conduzir a programação.
   const eligible = data.competencies.filter(c => !c.notionSource?.preserveDate || !c.notionSource.nextStudy ||
     data.sessions.some(s => s.competency_id === c.id && s.status !== 'missed') || c.notionSource.nextStudy <= date.toString());
-  return { spent, todaySessions, plan: planDay({ userId, now, competencies: eligible, windows, busy: [],
+  const connected=new Set(data.calendar?.connections.filter(c=>c.status==='connected').map(c=>c.id));
+  const busy=(data.calendar?.events??[]).filter(e=>connected.has(e.connection_id)).map(e=>({start:Date.parse(e.starts_at),end:Date.parse(e.ends_at),status:e.status}));
+  return { spent, todaySessions, plan: planDay({ userId, now, competencies: eligible, windows, busy,
     dailyMinutes, spentMinutes: spent, weeklyRemainingMinutes: 7 * 720, minimumSession: 5, maximumSessions: 6,
     useStudyCycle:true, startSmall:override!==null && override-spent<=5,
     maxEffort: rules[0]?.max_effort ?? 'high', completedIds, rotations: data.rotations, exams: [] }) };

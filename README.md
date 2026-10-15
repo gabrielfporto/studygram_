@@ -36,6 +36,7 @@ O Vite serve `/studygram_/`. URL/chave publicável do Supabase estão no cliente
 - FSRS no servidor; leitura passiva não altera memória.
 - Importação do Notion por CSV ou tabela colada, com prévia, mapeamento, duplicatas e histórico preservado. [Como importar](docs/notion-import.md).
 - Ciclo de estudo com próximos passos concretos, começo de 5 minutos, timer com retomada e materiais externos. [Como funciona](docs/study-cycle.md).
+- Plano com barras de tempo por dia e leitura de disponibilidade do Google Calendar. Requer ativação do Client ID OAuth: [configuração e limites](docs/google-calendar.md).
 - Gravação atômica, idempotência e controle de versão entre dispositivos.
 - Progresso: retenção estimada, questões, cobertura e competências em risco.
 - Migrations: 21 tabelas públicas, uma privada, RLS, índices e constraints.
@@ -47,7 +48,7 @@ O Vite serve `/studygram_/`. URL/chave publicável do Supabase estão no cliente
 
 A simulação usa 50 temas/150 competências fictícias em três seeds; nenhuma fixture é inserida em produção. Testes de UI simulam respostas de transporte; testes SQL executam PostgreSQL local. O primeiro login confirmado deve validar o fluxo completo em produção.
 
-Próximos módulos: provas/rodízios futuros na interface, snapshots diários, calendário semanal, Google Calendar, IA e offline. O plano atual é calculado no navegador a partir dos dados reais; a memória é atualizada no servidor. Ajustes rápidos de tempo e formulários não salvos não sobrevivem a recarregamento. Não há pagamentos.
+Próximos módulos: provas/rodízios futuros na interface, snapshots diários, calendário semanal, sincronização em segundo plano, IA e offline. O plano atual é calculado no navegador a partir dos dados reais; a memória é atualizada no servidor. Ajustes rápidos de tempo e formulários não salvos não sobrevivem a recarregamento. Não há pagamentos.
 
 ## Estrutura
 

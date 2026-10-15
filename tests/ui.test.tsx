@@ -26,8 +26,11 @@ const { SessionForm } = await import('../web/components/SessionForm');
 const { GuidedSession } = await import('../web/components/GuidedSession');
 const { MaterialLink } = await import('../web/components/MaterialLink');
 const { readDraft,storeDraft,elapsedSeconds,togglePause } = await import('../web/lib/active-study');
+const { CalendarPanel } = await import('../web/components/CalendarPanel');
+const google = await import('../web/lib/google-calendar');
+const { calendarState } = await import('../web/lib/calendar-state');
 const { supabase } = await import('../web/lib/client');
-afterEach(()=>{cleanup();mock.restoreAll();localStorage.clear();});
+afterEach(()=>{cleanup();mock.restoreAll();localStorage.clear();google.clearGoogleSession();delete window.google;});
 after(async()=>{await supabase.auth.dispose();dom.window.close();});
 const data:StudyData={profile:{goal:'Internato',timezone:'America/Bahia'},competencies:fixtures(),areas:[],topics:[],sessions:[],questions:[],rules:[],contexts:[],rotations:[]};
 
@@ -160,4 +163,48 @@ test('Material: rejeita protocolo executável e salva link sem mudar o assunto',
   fireEvent.click(screen.getByRole('button',{name:'Salvar link'}));await waitFor(()=>assert(screen.getByRole('alert')));assert.equal(changes.length,0);
   fireEvent.change(screen.getByLabelText(`Link do material de ${c.title}`),{target:{value:'https://example.com/aula'}});
   fireEvent.click(screen.getByRole('button',{name:'Salvar link'}));await waitFor(()=>assert(saved));assert.deepEqual(changes,[{resource_url:'https://example.com/aula'}]);
+});
+
+test('Plano: barra ajusta o limite, respeita a janela e salva descanso com zero minutos',async()=>{
+  let saved:unknown=null;
+  mock.method(supabase,'rpc',(_name:string,input:unknown)=>{saved=input;return Promise.resolve({data:null,error:null});});
+  render(<Settings data={data} onSaved={async()=>{}}/>);
+  fireEvent.change(screen.getByLabelText('Contexto atual'),{target:{value:'MFC'}});
+  const slider=screen.getByRole('slider',{name:'Limite Segunda'});
+  fireEvent.change(slider,{target:{value:'105'}});assert.equal(slider.getAttribute('aria-valuetext'),'1 h 45 min');
+  fireEvent.change(screen.getByLabelText('Fim Segunda'),{target:{value:'19:00'}});assert.equal((slider as HTMLInputElement).value,'60');assert.equal(slider.getAttribute('max'),'60');
+  fireEvent.change(slider,{target:{value:'0'}});assert.equal(slider.getAttribute('aria-valuetext'),'Descanso');
+  fireEvent.click(screen.getByRole('button',{name:/Salvar rotina/}));await waitFor(()=>assert(saved));
+  assert.equal((saved as {p_rules:{weekday:number;minutes:number}[]}).p_rules.find(r=>r.weekday===1)!.minutes,0);
+});
+
+test('Calendar: Google token só fica na memória e consulta parcial não grava snapshot',async()=>{
+  const calls:{url:string;authorization:string|null}[]=[];let persisted:unknown=null;let googleError=false;
+  window.google={accounts:{oauth2:{initTokenClient:config=>({requestAccessToken:()=>{assert.equal(config.scope,google.GOOGLE_SCOPES.join(' '));config.callback({access_token:'only-in-memory',expires_in:3600});}}),hasGrantedAllScopes:()=>true,revoke:(_token,callback)=>callback({successful:true})}}};
+  mock.method(globalThis,'fetch',async (url:unknown,init?:RequestInit)=>{calls.push({url:String(url),authorization:new Headers(init?.headers).get('Authorization')});return new Response(JSON.stringify(String(url).includes('calendarList')?{items:[{id:'a',summary:'Agenda',primary:true}]}:{calendars:{a:googleError?{busy:[],errors:[{reason:'internalError'}]}:{busy:[{start:'2026-10-15T12:00:00Z',end:'2026-10-15T13:00:00Z'}]}}}));});
+  mock.method(supabase,'rpc',(_name:string,input:unknown)=>{persisted=input;return Promise.resolve({error:null,data:{}});});
+  await google.loadGoogleIdentity();await google.authorizeGoogle('a','123-test.apps.googleusercontent.com');assert(google.hasGoogleToken('a'));assert(!google.hasGoogleToken('b'));assert.equal(localStorage.length,0);
+  const calendars=await google.listGoogleCalendars('a');await google.syncGoogleCalendar('a',calendars,'America/Bahia',START);
+  assert(persisted);assert(!JSON.stringify(persisted).includes('only-in-memory'));assert(calls.every(c=>c.authorization==='Bearer only-in-memory'));
+  persisted=null;googleError=true;await assert.rejects(google.syncGoogleCalendar('a',calendars,'America/Bahia',START),/último estado/);assert.equal(persisted,null);
+  assert(await google.revokeGoogle('a'));assert(!google.hasGoogleToken('a'));
+});
+
+test('Calendar: tela autoriza, permite seleção e só anuncia sincronização após resposta',async()=>{
+  let saved=false;const synced:string[][]=[];
+  const api={load:async()=>{},authorize:async()=>{},list:async()=>[{id:'primary',summary:'Pessoal',primary:true},{id:'work',summary:'Trabalho'}],cached:()=>[],hasToken:()=>true,revoke:async()=>true,sync:async(_user:string,selected:{id:string}[])=>{synced.push(selected.map(c=>c.id));return{from:'',to:'',calendars:[],busy:[]};}};
+  render(<CalendarPanel data={{...data,userId:'a'}} onSaved={async()=>{saved=true;}} clientId="123-test.apps.googleusercontent.com" api={api}/>);
+  await waitFor(()=>assert.equal((screen.getByRole('button',{name:'Conectar Google Calendar'}) as HTMLButtonElement).disabled,false));
+  fireEvent.click(screen.getByRole('button',{name:'Conectar Google Calendar'}));await waitFor(()=>assert(screen.getByLabelText('Trabalho')));assert.equal(synced.length,0);
+  fireEvent.click(screen.getByLabelText('Trabalho'));fireEvent.click(screen.getByRole('button',{name:'Sincronizar agendas selecionadas'}));await waitFor(()=>assert(saved));assert.deepEqual(synced,[['primary','work']]);
+  assert(screen.getByText('Agenda atualizada. Seu plano foi recalculado.'));
+});
+
+test('Calendar: compromissos bloqueiam rotina e começo de 5 minutos; cache antigo é sinalizado',()=>{
+  const c={...data.competencies[0]!,card:newMemory(START),evidence:[],completedStages:[]};
+  const imported={...data,competencies:[c],calendar:{connections:[{id:'conn',external_calendar_id:'a',status:'connected' as const,last_synced_at:START.toISOString(),sync_range_start:'2026-10-15T03:00:00Z',sync_range_end:'2026-10-29T03:00:00Z'}],events:[{id:'busy',connection_id:'conn',starts_at:START.toISOString(),ends_at:new Date(START.getTime()+30*60000).toISOString(),status:'busy' as const}]}};
+  assert.equal(makePlan(imported,c.userId,START,5).plan.items.length,0);
+  const full=makePlan(imported,c.userId,START,60);assert.equal(full.plan.capacityMinutes,30);assert(full.plan.items.every(i=>i.start>=START.getTime()+30*60000));
+  assert.equal(calendarState(imported,START).stale,false);assert.equal(calendarState(imported,new Date(START.getTime()+2*3600000)).stale,true);
+  assert.equal(makePlan({...imported,calendar:{...imported.calendar,connections:imported.calendar.connections.map(c=>({...c,status:'disconnected' as const}))}},c.userId,START,5).plan.items.length,1);
 });
