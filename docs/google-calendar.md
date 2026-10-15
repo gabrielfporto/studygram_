@@ -20,7 +20,7 @@ O Client ID é público e identifica o aplicativo; cada usuário ainda precisa c
 
 ## Publicação da configuração
 
-No repositório `gabrielfporto/studygram_`, em **Settings → Secrets and variables → Actions → Variables**, crie a variável de repositório **GOOGLE_CLIENT_ID** com o ID público. Execute novamente o workflow **Validate and publish Studygram**, ou publique um novo commit. O workflow passa o valor como `VITE_GOOGLE_CLIENT_ID` ao build do Vite. Para desenvolvimento local, use a mesma variável `VITE_GOOGLE_CLIENT_ID` no `.env` ignorado pelo Git.
+O Client ID público do Studygram está configurado no workflow de publicação. Para substituí-lo sem alterar código, no repositório `gabrielfporto/studygram_`, em **Settings → Secrets and variables → Actions → Variables**, crie a variável de repositório **GOOGLE_CLIENT_ID** com o novo ID público. Execute novamente o workflow **Validate and publish Studygram**, ou publique um novo commit. Essa variável tem prioridade sobre o ID configurado no workflow e é passada como `VITE_GOOGLE_CLIENT_ID` ao build do Vite. Para desenvolvimento local, use a mesma variável `VITE_GOOGLE_CLIENT_ID` no `.env` ignorado pelo Git.
 
 O painel do app mostra a conexão como pendente enquanto o Client ID não estiver configurado. Não há dados fictícios nem autorização simulada no aplicativo publicado.
 

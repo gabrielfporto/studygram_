@@ -22,7 +22,7 @@ jobs:
       - run: npm run check
       - run: npm run build
         env:
-          VITE_GOOGLE_CLIENT_ID: ${{ vars.GOOGLE_CLIENT_ID }}
+          VITE_GOOGLE_CLIENT_ID: ${{ vars.GOOGLE_CLIENT_ID || '344261563368-c4459l0p47sag163hl62lk39vq78poe3.apps.googleusercontent.com' }}
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         with:
