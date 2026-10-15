@@ -31,7 +31,10 @@ export function weakness(c: Competency, now: Date): number {
   const worsening = events.length >= 2 ? clamp(rate(events.slice(0, mid)) - rate(events.slice(mid))) : 0;
   const objective = 0.45 * ((wrong + 2) / (total + 4)) + 0.2 * clamp(errors / 10)
     + 0.15 * clamp(recurring / 5) + 0.1 * clamp(c.card.lapses / 5) + 0.1 * worsening;
-  return 0.8 * (total ? objective : 0.5) + 0.2 * reported;
+  // Erros descritos não são convertidos em tentativas ou acertos fictícios.
+  const recorded=(c.mistakeHistory??[]).filter(m=>daysBetween(now,m.at)>=0&&daysBetween(now,m.at)<=30);
+  const repeated=recorded.length-new Set(recorded.map(m=>m.key)).size;
+  return clamp(0.8 * (total ? objective : 0.5) + 0.2 * reported + 0.1*clamp(recorded.length/5) + 0.05*clamp(repeated/3));
 }
 
 export function priority(c: Competency, context: Context, custom: Weights = defaultWeights): Priority {

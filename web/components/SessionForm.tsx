@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import type { Competency } from '../../src/domain/model';
 import type { SessionInput } from '../../src/application/session';
+import { CompetencyPicker } from './CompetencyPicker';
 
 export function SessionForm({ competencies, initialId, minutes, method, onSave, onClose, sessionKey, actualMinutes, initialStatus, locked=false, startedAt }: {
   competencies: Competency[]; initialId: string; minutes: number; method: SessionInput['method'];
@@ -20,6 +21,7 @@ export function SessionForm({ competencies, initialId, minutes, method, onSave, 
     e.preventDefault(); setBusy(true); setError('');
     const endedAt = new Date(); const actual = status === 'missed' ? 0 : duration;
     try {
+      if(!selected)throw new Error('Escolha a competência que você estudou.');
       if (status!=='missed' && !['reading','priming'].includes(studyMethod) && (studyMethod!=='questions'||total>0) && !feedback) throw new Error('Informe como foi lembrar antes de salvar.');
       await onSave({ competencyId: selected, idempotencyKey: id, actualMinutes: actual, plannedMinutes: minutes,
         startedAt: startedAt ?? new Date(endedAt.getTime() - actual * 60000).toISOString(), endedAt: endedAt.toISOString(),
@@ -33,7 +35,7 @@ export function SessionForm({ competencies, initialId, minutes, method, onSave, 
     <div className="dialog-head"><div><p className="eyebrow">REGISTRAR PRÁTICA</p><h2 id="session-title">Como foi o estudo?</h2></div><button disabled={busy} className="secondary" onClick={onClose}>Fechar</button></div>
     <p className="muted">Estude no seu material e registre o resultado aqui. Não é necessário manter esta janela aberta.</p>
     {locked && <p className="caption">Confira o tempo efetivo. Escolha “Concluí esta etapa” apenas se terminou o objetivo; o timer não conclui a etapa por você.</p>}
-    <form onSubmit={submit}><label>Competência<select disabled={locked || busy} value={selected} onChange={e => setSelected(e.target.value)}>{competencies.filter(c => !c.archived).map(c => <option value={c.id} key={c.id}>{c.topic} · {c.title}</option>)}</select></label>
+    <form onSubmit={submit}><CompetencyPicker competencies={competencies} value={selected} onChange={setSelected} disabled={locked||busy}/>
       <div className="form-grid"><label>Resultado<select value={status} onChange={e => setStatus(e.target.value as typeof status)}><option value="completed">Concluí esta etapa</option><option value="partial">Avancei, vou retomar</option><option value="missed">Não realizado</option></select></label>
       <label>Tempo real (min)<input type="number" min={1} max={720} required disabled={status === 'missed'} value={duration} onChange={e => setDuration(Number(e.target.value))}/></label></div>
       <label>Método<select disabled={locked || busy} value={studyMethod} onChange={e => setMethod(e.target.value as typeof studyMethod)}><option value="priming">Preparação / priming</option><option value="new">Conteúdo novo + recuperação</option><option value="reading">Leitura / aula</option><option value="recall">Recuperação ativa</option><option value="questions">Questões</option><option value="case">Caso clínico</option><option value="explanation">Explicação sem consulta</option></select></label>

@@ -26,7 +26,7 @@ O painel do app mostra a conexão como pendente enquanto o Client ID não estive
 
 ## Uso no aplicativo
 
-1. Entre no Studygram e abra **Plano → Google Calendar**.
+1. Entre no Studygram e abra **Plano → Agenda Google**.
 2. Clique em **Conectar Google Calendar** e autorize os dois acessos solicitados pelo Google.
 3. Escolha as agendas e clique em **Sincronizar agendas selecionadas**.
 4. Os intervalos ocupados dos próximos 14 dias são salvos em lote e descontados das janelas de estudo, inclusive do começo de cinco minutos. As horas livres continuam limitadas pela disponibilidade que o usuário definiu.
@@ -46,6 +46,6 @@ Para liberar a pessoas fora da lista de teste, prepare a configuração de produ
 
 ## Verificação
 
-Testes cobrem slider e persistência, OAuth/transporte com respostas simuladas, isolamento do token por conta, múltiplas agendas, erros parciais, fusos, união de intervalos, conflito no planejamento, cache desatualizado, RLS, rollback e desconexão isolada. O primeiro consentimento e a sincronização com uma conta real só podem ser conferidos depois que o Client ID estiver configurado.
+Testes cobrem slider e persistência, OAuth/transporte com respostas simuladas, isolamento do token por conta, múltiplas agendas, erros parciais, fusos, união de intervalos, conflito no planejamento, cache desatualizado, RLS, rollback e desconexão isolada. O Client ID está configurado e o usuário confirmou consentimento e sincronização com uma conta real. O painel mostra agora o resultado da consulta e os horários podem ser consultados em Plano → Semana.
 
 Referências oficiais: [Token model](https://developers.google.com/identity/oauth2/web/guides/use-token-model), [Configurar OAuth](https://developers.google.com/workspace/guides/configure-oauth-consent), [FreeBusy](https://developers.google.com/workspace/calendar/api/v3/reference/freebusy/query), [CalendarList](https://developers.google.com/workspace/calendar/api/v3/reference/calendarList/list), [Preparação para produção](https://developers.google.com/identity/protocols/oauth2/production-readiness/policy-compliance).

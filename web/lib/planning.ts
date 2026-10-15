@@ -32,5 +32,5 @@ export function makePlan(data: StudyData, userId: string, now: Date, override: n
   return { spent, todaySessions, plan: planDay({ userId, now, competencies: eligible, windows, busy,
     dailyMinutes, spentMinutes: spent, weeklyRemainingMinutes: 7 * 720, minimumSession: 5, maximumSessions: 6,
     useStudyCycle:true, startSmall:override!==null && override-spent<=5,
-    maxEffort: rules[0]?.max_effort ?? 'high', completedIds, rotations: data.rotations, exams: [] }) };
+    maxEffort: rules[0]?.max_effort ?? 'high', completedIds, rotations: data.rotations, exams: data.exams??[] }) };
 }

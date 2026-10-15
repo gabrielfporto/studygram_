@@ -3,12 +3,15 @@ import { supabase } from '../lib/client';
 import type { StudyData } from '../lib/data';
 import { durationLabel, windowCapacity } from '../lib/duration';
 import { CalendarPanel } from './CalendarPanel';
+import { WeekOverview } from './WeekOverview';
+import { AcademicEvents } from './AcademicEvents';
 
 const weekdays = ['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
-export function Settings({ data, onSaved }: { data: StudyData; onSaved: () => Promise<void> }) {
+export function Settings({ data, onSaved,initialSection }: { data: StudyData; onSaved: () => Promise<void>;initialSection?:'week'|'routine'|'calendar'|'events'|undefined }) {
   const [goal, setGoal] = useState(data.profile?.goal ?? '');
   const [timezone, setTimezone] = useState(data.profile?.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone);
   const active = data.rotations.find(r => r.start <= new Date() && r.end > new Date());
+  const [view,setView]=useState(initialSection??(data.rules.length&&active?'week':'routine'));
   const [context, setContext] = useState(data.contexts.find(c => c.id === active?.contextId)?.title ?? '');
   const [rules, setRules] = useState(weekdays.map((_, weekday) => {
     const r = data.rules.find(r => r.weekday === weekday);
@@ -29,7 +32,8 @@ export function Settings({ data, onSaved }: { data: StudyData; onSaved: () => Pr
     finally { setBusy(false); }
   }
   return <><header className="page-header"><div><p className="eyebrow">UM PLANO QUE RESPEITA VOCÊ</p><h1>Seu ritmo, suas janelas.</h1><p className="muted">Defina os limites. As prioridades ficam por conta do motor.</p></div></header>
-    <form onSubmit={submit} className="settings-form"><details className="profile-settings" open={!data.profile||!data.profile.goal||!active}><summary>Objetivo, contexto e fuso{context?` · ${context}`:''}</summary><div className="form-grid"><label>Seu objetivo<input required maxLength={1000} placeholder="Ex.: consolidar os conteúdos do internato" value={goal} onChange={e => setGoal(e.target.value)}/></label><label>Contexto atual<input required maxLength={200} list="context-options" placeholder="Ex.: Emergência" value={context} onChange={e => setContext(e.target.value)}/></label><datalist id="context-options">{['MFC','Emergência','Clínica Médica','Pediatria','Cirurgia','Obstetrícia'].map(c => <option key={c}>{c}</option>)}</datalist></div>
+    <nav className="plan-sections" aria-label="Seções do plano">{[['week','Semana'],['routine','Rotina'],['calendar','Agenda Google'],['events','Provas e rodízios']].map(([key,label])=><button type="button" key={key} className={view===key?'primary':'secondary'} aria-pressed={view===key} onClick={()=>setView(key as typeof view)}>{label}</button>)}</nav>
+    <div hidden={view!=='routine'}><form onSubmit={submit} className="settings-form"><details className="profile-settings" open={!data.profile||!data.profile.goal||!active}><summary>Objetivo, contexto e fuso{context?` · ${context}`:''}</summary><div className="form-grid"><label>Seu objetivo<input required maxLength={1000} placeholder="Ex.: consolidar os conteúdos do internato" value={goal} onChange={e => setGoal(e.target.value)}/></label><label>Contexto atual<input required maxLength={200} list="context-options" placeholder="Ex.: Emergência" value={context} onChange={e => setContext(e.target.value)}/></label><datalist id="context-options">{['MFC','Emergência','Clínica Médica','Pediatria','Cirurgia','Obstetrícia'].map(c => <option key={c}>{c}</option>)}</datalist></div>
       <label>Fuso horário<input required value={timezone} onChange={e => setTimezone(e.target.value)} placeholder="America/Bahia"/></label></details>
       <div className="section-title"><h2>Sua semana</h2><span className="caption">Até {durationLabel(rules.reduce((n,r)=>n+r.minutes,0))} na semana</span></div>
       <p className="muted small">Arraste a barra para escolher o limite de cada dia. No início da barra, o dia fica reservado para descanso.</p>
@@ -44,5 +48,5 @@ export function Settings({ data, onSaved }: { data: StudyData; onSaved: () => Pr
       </section>)}</div>
       <div className="settings-actions"><p className="caption">Seu limite é um teto, não uma obrigação.</p>
       {message && <p role="status" className="notice">{message}</p>}<button className="primary" disabled={busy}>{busy ? 'Salvando…' : 'Salvar rotina e recalcular →'}</button></div>
-    </form><CalendarPanel data={data} onSaved={onSaved}/></>;
+    </form></div><div hidden={view!=='week'}><WeekOverview data={data}/><button className="text-button" onClick={()=>setView('routine')}>Ajustar minha rotina →</button></div><div hidden={view!=='calendar'}><CalendarPanel data={data} onSaved={onSaved}/></div><div hidden={view!=='events'}><AcademicEvents data={data} onSaved={onSaved}/></div></>;
 }

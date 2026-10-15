@@ -29,6 +29,7 @@ export const competencySchema = z.object({
   newMinutes: z.number().int().min(25).max(90), reviewMinutes: z.number().int().min(10).max(45),
   effort: effortSchema, card: cardSchema, evidence: z.array(evidenceSchema),
   lastExposure: z.date().optional(), archived: z.boolean().default(false), notionSource: notionSourceSchema.nullable().optional(),
+  mistakeHistory:z.array(z.object({at:z.date(),key:z.string()})).optional(),
   completedStages: z.array(stageSchema).optional(), materialUrl: z.string().nullable().optional(),
 });
 export type Competency = Omit<z.infer<typeof competencySchema>, 'card'> & { card: Card };

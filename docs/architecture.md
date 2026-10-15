@@ -98,7 +98,7 @@ Estados de produto: não estudado antes de primeira recuperação; aprendendo na
 
 **Auth/repos**: interfaces por caso de uso, usuário extraído de sessão validada; nunca fixo. Mobile armazena credenciais no armazenamento seguro. IDs de usuário da fixture existem apenas em simulation/tests. Offline: outbox de sessões com UUID, sincronização idempotente; plano em cache exibe data da última atualização. Não mostrar sucesso remoto sem confirmação.
 
-**Google Calendar (fase 3)**: OAuth Authorization Code + PKCE/state, redirect URI registrado; escopo readonly mínimo para eventos. Troca/refresh no servidor; tokens cifrados e nunca retornados ao aplicativo. Ler calendários selecionados, expandir recorrências, tratar paginação, syncToken/410, exclusões/cancelamentos, eventos de dia inteiro no fuso de origem e horário de verão. Janela de sincronização limitada. Não exportar sessões. Consentimento separado caso escrita seja implementada no futuro. Revogar e eliminar tokens ao desconectar.
+**Google Calendar (fase 3, entrega web)**: Google Identity Services Token Model, autorização por pop-up e token temporário somente em memória. Leitura de CalendarList e freeBusy de até dez agendas, por 14 dias; o Google resolve recorrências e eventos de dia inteiro. Snapshot atômico apenas de intervalos, sem títulos de eventos. Falha em qualquer agenda preserva o último snapshot; cache antigo ou fora da cobertura é sinalizado. O painel mostra conflitos e janelas livres, inclusive quando nada muda. Atualização manual e nova autorização após expiração; não há refresh token, sincronização com o app fechado nem exportação de sessões. Revogação com token presente; sem token, desconexão local e link para remover a permissão no Google. Esta decisão substitui o fluxo servidor/PKCE inicialmente previsto. Consulte `google-calendar.md`.
 
 **AIService (fase 4)**: interpretStudyLog, generateRecallQuestion, classifyError, analyzePerformance, explainPriority, suggestCompetencies. Interfaces e DTOs agora; implementação real somente nessa fase. Respostas estruturadas validadas, limite de contexto/saída, timeout, cache por usuário/hash/versão, contabilização servidor, modelos via env (`AI_PROVIDER`, `AI_MODEL_SIMPLE`, `AI_MODEL_COMPLEX`). Nunca enviar agenda inteira ou títulos privados. Propostas com entidade alvo e confiança; confirmação para ambiguidade, importações e alterações amplas. Texto externo é dado, não instrução de ferramenta. Sem IA, registro manual e motor continuam funcionando.
 
@@ -128,13 +128,13 @@ Estrutura atual: `src/domain` (validação/tipos), `src/engine` (memória/priori
 
 | Etapa | Entrega | Critério para avançar |
 |---|---|---|
-| 0, atual | arquitetura + motor + simulação | dez casos, invariantes, determinismo, testes SQL locais |
-| 1 | Supabase real + Auth + CRUD + disponibilidade + sessões + Hoje | isolamento com duas contas, persistência e fluxo completo no dispositivo |
-| 2 | FSRS no fluxo do produto + recall + erros + progresso | recuperação persiste atomicamente, indicadores sem evidência falsa |
-| 3 | Google Calendar | OAuth/refresh/revogação, fusos, recorrência, falha de sync |
+| 0, entregue | arquitetura + motor + simulação | dez casos, invariantes, determinismo, testes SQL locais |
+| 1, entregue no escopo web | Supabase real + Auth + CRUD + disponibilidade + sessões + Hoje | isolamento com duas contas, persistência e fluxo completo no dispositivo |
+| 2, entregue no escopo web | FSRS no fluxo do produto + recall + erros + progresso | recuperação persiste atomicamente, indicadores sem evidência falsa |
+| 3, entregue no escopo web | Google Calendar | autorização real validada pelo usuário; snapshot, fusos, conflitos, falhas e desconexão testados; atualização manual |
 | 4 | IA estruturada | confirmação, limites/custo, schema e proteção de contexto |
 | 5 | refinamento / analytics / SaaS | acessibilidade, offline, carga e observabilidade |
 
-FSRS é antecipado apenas no núcleo/simulação para não validar o planejador com memória inventada. Não significa que a fase 2 da aplicação esteja pronta.
+O FSRS está integrado ao fluxo real. Erros específicos ficam em um caderno com busca, revisão/reabertura e influência limitada na prioridade; não criam questões fictícias. Progresso mostra quatro semanas de prática e questões, com ressalvas sobre amostras. Provas e rodízios são cadastrados com temas relacionados. A capacidade dos próximos sete dias é uma previsão; não simula aprendizado nem promete atividades futuras. Consulte `phases-0-3.md` para evidências e limites.
 
 Fontes técnicas: [RLS Supabase](https://supabase.com/docs/guides/database/postgres/row-level-security), [TS-FSRS](https://open-spaced-repetition.github.io/ts-fsrs/). As ponderações e utilidades acima são hipóteses de produto a calibrar com uso real.

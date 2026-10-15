@@ -16,10 +16,12 @@ export const ruleSchema = z.object({ weekday: z.number(), starts_local: z.string
 export type Rule = z.infer<typeof ruleSchema>;
 const connection=z.object({id:z.string(),external_calendar_id:z.string(),display_name:z.string().nullable().optional(),status:z.enum(['connected','expired','disconnected']),last_synced_at:z.string().nullable(),sync_range_start:z.string().nullable().optional(),sync_range_end:z.string().nullable().optional()});
 const calendarEvent=z.object({id:z.string(),connection_id:z.string(),starts_at:z.string(),ends_at:z.string(),status:z.enum(['busy','free','cancelled'])});
-async function rows<T>(table: string, userId: string, schema: z.ZodType<T>): Promise<T[]> {
+async function rows<T>(table: string, userId: string, schema: z.ZodType<T>,order=['id']): Promise<T[]> {
   const result: T[] = [];
   for (let offset = 0; ; offset += 500) {
-    const { data, error } = await supabase.from(table).select('*').eq('user_id', userId).order('id').range(offset, offset + 499);
+    let query=supabase.from(table).select('*').eq('user_id',userId);
+    for(const key of order)query=query.order(key);
+    const {data,error}=await query.range(offset,offset+499);
     if (error) throw error;
     const page = z.array(schema).parse(data);
     result.push(...page);
@@ -28,16 +30,17 @@ async function rows<T>(table: string, userId: string, schema: z.ZodType<T>): Pro
   return result;
 }
 export async function loadData(userId: string) {
-  const [areas, topics, competencies, reviews, questions, sessions, rules, contexts, rotations, links, connections, calendarEvents] = await Promise.all([
+  const [areas, topics, competencies, reviews, questions, sessions, rules, contexts, rotations, links, connections, calendarEvents, mistakes, exams, examLinks] = await Promise.all([
     rows('study_areas', userId, named), rows('topics', userId, named.extend({ area_id: z.string() })), rows('competencies', userId, competency),
     rows('reviews', userId, z.object({ competency_id: z.string(), card: z.record(z.string(), z.unknown()) })),
     rows('question_sessions', userId, question), rows('study_sessions', userId, session), rows('availability_rules', userId, ruleSchema),
-    rows('academic_contexts', userId, named), rows('rotations', userId, z.object({ context_id: z.string(), starts_at: z.string(), ends_at: z.string() })),
-    // Tabela de ligação não tem id, por isso consulta própria com chave composta ordenada.
-    supabase.from('competency_contexts').select('competency_id,context_id').eq('user_id', userId).order('competency_id').limit(10000),
+    rows('academic_contexts', userId, named), rows('rotations', userId, z.object({ id:z.string(), context_id: z.string(), starts_at: z.string(), ends_at: z.string(), archived:z.boolean() })),
+    rows('competency_contexts',userId,z.object({competency_id:z.string(),context_id:z.string()}),['competency_id','context_id']),
     rows('calendar_connections',userId,connection),rows('calendar_events',userId,calendarEvent),
+    rows('mistakes',userId,z.object({id:z.string(),competency_id:z.string(),description:z.string(),classification_key:z.string().nullable(),occurred_at:z.string(),resolved_at:z.string().nullable()})),
+    rows('exams',userId,z.object({id:z.string(),title:z.string(),occurs_at:z.string(),archived:z.boolean()})),
+    rows('exam_competencies',userId,z.object({exam_id:z.string(),competency_id:z.string()}),['exam_id','competency_id']),
   ]);
-  if (links.error) throw links.error;
   const { data: profile, error } = await supabase.from('profiles').select('goal,timezone').eq('user_id', userId).maybeSingle();
   if (error) throw error;
   const safeProfile = profile ? z.object({ goal: z.string(), timezone: z.string() }).parse(profile) : null;
@@ -54,14 +57,16 @@ export async function loadData(userId: string) {
       ev.push({ at: new Date(s.ended_at ?? s.started_at), total: 0, correct: 0, errors: 0, recurringErrors: 0, reportedDifficulty: (4 - s.feedback!) / 3 });
     }
     return validateCompetency({ id: c.id, userId, topicId: c.topic_id, area: area?.title ?? 'Área', topic: topic?.title ?? 'Tema', title: c.title,
-      contextIds: (links.data ?? []).filter(l => l.competency_id === c.id).map(l => l.context_id), importance: c.importance,
+      contextIds: links.filter(l => l.competency_id === c.id).map(l => l.context_id), importance: c.importance,
       manualPriority: c.manual_priority, newMinutes: c.new_minutes, reviewMinutes: c.review_minutes, effort: c.effort,
       archived: c.archived, notionSource: c.notion_source ?? null, materialUrl:c.resource_url ?? null,
+      mistakeHistory:mistakes.filter(m=>m.competency_id===c.id&&!m.resolved_at).map(m=>({at:new Date(m.occurred_at),key:m.classification_key??m.description})),
       completedStages:stagesFromSessions(sessions.filter(s=>s.competency_id===c.id),questions),
+      ...(()=>{const exposure=sessions.filter(s=>s.competency_id===c.id&&s.actual_minutes>0&&Date.parse(s.started_at)<=now.getTime()).sort((a,b)=>b.started_at.localeCompare(a.started_at))[0];return exposure?{lastExposure:new Date(exposure.ended_at??exposure.started_at)}:{};})(),
       card: review ? deserializeCard(review.card) : newMemory(now), evidence: ev.sort((a,b)=>a.at.getTime()-b.at.getTime()) });
   });
-  return { userId,calendar:{connections,events:calendarEvents},profile: safeProfile, areas, topics, competencies: models, sessions, questions, rules, contexts,
-    rotations: rotations.map(r => ({ contextId: r.context_id, start: new Date(r.starts_at), end: new Date(r.ends_at) })) };
+  return { userId,mistakes,exams:exams.filter(e=>!e.archived).map(e=>({id:e.id,title:e.title,at:new Date(e.occurs_at),competencyIds:examLinks.filter(l=>l.exam_id===e.id).map(l=>l.competency_id)})),calendar:{connections,events:calendarEvents},profile: safeProfile, areas, topics, competencies: models, sessions, questions, rules, contexts,
+    rotations: rotations.filter(r=>!r.archived).map(r => ({ id:r.id, contextId: r.context_id, start: new Date(r.starts_at), end: new Date(r.ends_at) })).sort((a,b)=>b.start.getTime()-a.start.getTime()) };
 }
 type LoadedData=Awaited<ReturnType<typeof loadData>>;
-export type StudyData = Omit<LoadedData,'calendar'|'userId'> & Partial<Pick<LoadedData,'calendar'|'userId'>>;
+export type StudyData = Omit<LoadedData,'calendar'|'userId'|'mistakes'|'exams'|'rotations'> & {rotations: (LoadedData['rotations'][number] | Omit<LoadedData['rotations'][number],'id'>)[]} & Partial<Pick<LoadedData,'calendar'|'userId'|'mistakes'|'exams'>>;

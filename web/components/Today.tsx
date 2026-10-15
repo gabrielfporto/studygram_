@@ -3,11 +3,12 @@ import type { StudyData } from '../lib/data';
 import type { Plan } from '../../src/engine/planner';
 import { instructions, nextStudyStep, type StudyMethod } from '../../src/engine/study-cycle';
 import { StageProgress } from './StageProgress';
+import { availabilitySummary } from '../lib/availability-summary';
 import { calendarState } from '../lib/calendar-state';
 
-export function Today({ data, plan, spent, now, onStart, onSettings, onContents, override, onOverride }: {
+export function Today({ data, plan, spent, now, onStart, onSettings, onContents,onCalendar, override, onOverride }: {
   data: StudyData; plan: Plan; spent: number; now: Date; onStart: (id: string, minutes: number, method: StudyMethod, small?:boolean) => void;
-  onSettings: () => void; onContents: () => void; override: number | null; onOverride: (value: number | null) => void;
+  onCalendar?:()=>void; onSettings: () => void; onContents: () => void; override: number | null; onOverride: (value: number | null) => void;
 }) {
   const [explain,setExplain]=useState(false); const [minutes,setMinutes]=useState(30);
   const next=plan.items[0]; const c=data.competencies.find(c=>c.id===next?.competencyId);
@@ -16,9 +17,9 @@ export function Today({ data, plan, spent, now, onStart, onSettings, onContents,
   const active=data.rotations.find(r=>r.start<=now && r.end>now);
   const context=data.contexts.find(c=>c.id===active?.contextId)?.title;
   const small=!!(c && next && next.minutes<nextStudyStep(c,now).minutes);
-  const calendar=calendarState(data,now);
+  const calendar=calendarState(data,now);const calendarImpact=availabilitySummary(data,now);
   return <><header className="page-header"><div><p className="eyebrow">{new Intl.DateTimeFormat('pt-BR',{weekday:'long',day:'numeric',month:'long',timeZone:data.profile?.timezone??'America/Bahia'}).format(now)}</p><h1>Você só precisa do próximo passo.</h1><p className="muted">{context?`${context} · seu contexto atual`:'Escolha feita. Comece pelo que cabe agora.'}</p></div><span className="status-dot">Plano adaptativo</span></header>
-    {calendar.connected && <div className="notice calendar-hint"><span>{calendar.stale?'Sua agenda precisa de atualização. O plano usa a última consulta salva.':'O plano já desconta os horários ocupados das agendas selecionadas.'}</span><button className="text-button" onClick={onSettings}>{calendar.stale?'Atualizar agenda':'Ver agendas'}</button></div>}
+    {calendar.connected && <div className="notice calendar-hint"><span>{calendar.stale?'Sua agenda precisa de atualização. O plano usa a última consulta salva.':calendarImpact.overlap?`Na rotina de hoje, ${calendarImpact.overlap} min coincidem com sua agenda. Veja o impacto e as janelas livres.`:'Agenda consultada: nenhum conflito com as janelas restantes da rotina de hoje.'}</span><button className="text-button" onClick={onCalendar??onSettings}>{calendar.stale?'Atualizar agenda':'Ver agendas'}</button></div>}
     <div className="today-grid"><section>
       {next && c && guide ? <article className="focus"><div className="focus-top"><p className="eyebrow">{small?'UM COMEÇO DE 5 MINUTOS':'SEU PRÓXIMO PASSO'}</p><span className="pill">{next.minutes} min</span></div><p className="topic-area">{c.area} · {c.topic}</p><h2>{c.title}</h2><p className="competency-title">{guide.title}</p><p className="muted">{guide.goal}</p><div className="actions"><button className="primary" onClick={()=>onStart(c.id,next.minutes,next.method,small)}>Iniciar sessão <span aria-hidden="true">↗</span></button>{next.minutes>5 && <button className="secondary" onClick={()=>onStart(c.id,5,next.method,true)}>Começar com 5 min</button>}</div><StageProgress competency={c}/>
         {next.start>now.getTime()+60000 && <p className="caption">Encaixe no plano: {new Date(next.start).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit',timeZone:data.profile?.timezone??'America/Bahia'})}. Para procurar um bloco a partir de agora, use o ajuste de tempo ao lado.</p>}

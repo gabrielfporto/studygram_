@@ -1,3 +1,4 @@
+import { CompetencyEditor } from './CompetencyEditor';
 import { useState, type FormEvent } from 'react';
 import { supabase } from '../lib/client';
 import { learningState } from '../../src/engine/memory';
@@ -41,6 +42,6 @@ export function Contents({ data, onSaved }: { data: StudyData; onSaved: () => Pr
     {message && <p role="status" className="notice">{message}</p>}
     <label className="search-label">Buscar no seu conteúdo<input type="search" placeholder="Área, tema ou competência" value={search} onChange={e => setSearch(e.target.value)}/></label>
     {!list.length && <div className="empty"><h2>{search ? 'Nenhum resultado' : 'Seu mapa começa com um tema.'}</h2><p className="muted">{search ? 'Tente outro termo.' : 'Adicione algo que você está estudando. Não é preciso organizar tudo agora.'}</p></div>}
-    {[...new Set(list.map(c => c.area))].map(area => <section className="area-section" key={area}><h2>{area}</h2>{[...new Set(list.filter(c => c.area === area).map(c => c.topicId))].map(topicId => <div className="topic-group" key={topicId}><h3>{list.find(c => c.topicId === topicId)!.topic}</h3>{list.filter(c => c.topicId === topicId).map(c => <div className="study-row" key={c.id}><div><strong>{c.title}</strong><p>{stateLabel(c)}</p><StageProgress competency={c}/><MaterialLink competency={c} onSaved={onSaved}/><SourceHistory source={c.notionSource}/></div><button className="text-button" disabled={busy} onClick={() => archive(c.id)} aria-label={`Arquivar ${c.title}`}>Arquivar</button></div>)}</div>)}</section>)}
+    {[...new Set(list.map(c => c.area))].map(area => <section className="area-section" key={area}><h2>{area}</h2>{[...new Set(list.filter(c => c.area === area).map(c => c.topicId))].map(topicId => <div className="topic-group" key={topicId}><h3>{list.find(c => c.topicId === topicId)!.topic}</h3>{list.filter(c => c.topicId === topicId).map(c => <div className="study-row" key={c.id}><div><strong>{c.title}</strong><p>{stateLabel(c)}</p><StageProgress competency={c}/><MaterialLink competency={c} onSaved={onSaved}/><CompetencyEditor competency={c} onSaved={onSaved}/><SourceHistory source={c.notionSource}/></div><button className="text-button" disabled={busy} onClick={() => archive(c.id)} aria-label={`Arquivar ${c.title}`}>Arquivar</button></div>)}</div>)}</section>)}
   </>;
 }

@@ -208,3 +208,59 @@ test('Calendar: compromissos bloqueiam rotina e começo de 5 minutos; cache anti
   assert.equal(calendarState(imported,START).stale,false);assert.equal(calendarState(imported,new Date(START.getTime()+2*3600000)).stale,true);
   assert.equal(makePlan({...imported,calendar:{...imported.calendar,connections:imported.calendar.connections.map(c=>({...c,status:'disconnected' as const}))}},c.userId,START,5).plan.items.length,1);
 });
+
+test('Registro: busca sem acentos seleciona a competência certa e preserva o formulário',async()=>{
+  let saved='';const wanted=data.competencies.find(c=>c.title==='Trombólise')!;
+  render(<SessionForm competencies={data.competencies} initialId="" minutes={20} method="reading" onClose={()=>{}} onSave={async s=>{saved=s.competencyId;}}/>);
+  fireEvent.change(screen.getByLabelText('Buscar área, tema ou competência'),{target:{value:'trombolise'}});
+  fireEvent.click(screen.getByRole('button',{name:new RegExp(wanted.topic+' · Trombólise')}));
+  fireEvent.change(screen.getByLabelText('Tempo real (min)'),{target:{value:'35'}});
+  fireEvent.click(screen.getByRole('button',{name:'Salvar e atualizar meu plano'}));
+  await waitFor(()=>assert.equal(saved,wanted.id));
+});
+
+test('Provas: temas relacionados e data no fuso são gravados pelo RPC atômico',async()=>{
+  const {AcademicEvents}=await import('../web/components/AcademicEvents');const calls:unknown[][]=[];
+  mock.method(supabase,'rpc',(...args:unknown[])=>{calls.push(args);return Promise.resolve({data:'ok',error:null});});
+  render(<AcademicEvents data={{...data,userId:'owner'}} onSaved={async()=>{}}/>);
+  fireEvent.change(screen.getByLabelText('Nome da prova'),{target:{value:'Prova de neurologia'}});
+  fireEvent.change(screen.getByLabelText('Data da prova'),{target:{value:'2026-11-02'}});
+  const topic=data.competencies[0]!;fireEvent.click(screen.getByLabelText(`${topic.area} · ${topic.topic}`));
+  fireEvent.click(screen.getByRole('button',{name:'Salvar evento e recalcular'}));
+  await waitFor(()=>assert.equal(calls.length,1));const args=calls[0]![1] as {p_start:string;p_competencies:string[]};
+  assert.equal(calls[0]![0],'save_academic_event');assert.equal(args.p_start,'2026-11-03T02:59:59.999Z');assert(args.p_competencies.includes(topic.id));
+});
+
+test('Erros: falha permite repetir com a mesma chave e não altera acertos',async()=>{
+  const {MistakeNotebook}=await import('../web/components/MistakeNotebook');const calls:{id:string;description:string}[]=[];
+  mock.method(supabase,'from',()=>({upsert:(payload:{id:string;description:string})=>{calls.push(payload);return Promise.resolve({error:calls.length===1?new Error('Sem rede'):null});}}));
+  render(<MistakeNotebook data={{...data,userId:'owner'}} onSaved={async()=>{}}/>);
+  fireEvent.click(screen.getByText('Registrar um erro específico'));
+  const c=data.competencies[0]!;fireEvent.change(screen.getByLabelText('Buscar área, tema ou competência'),{target:{value:c.title}});
+  fireEvent.click(screen.getByRole('button',{name:`${c.topic} · ${c.title} ${c.area}`}));
+  fireEvent.change(screen.getByLabelText('O que você errou ou confundiu?'),{target:{value:'Confundi os critérios'}});
+  fireEvent.click(screen.getByRole('button',{name:'Salvar ponto de atenção'}));await waitFor(()=>assert(screen.getByText('Sem rede')));
+  fireEvent.click(screen.getByRole('button',{name:'Salvar ponto de atenção'}));await waitFor(()=>assert(screen.getByText(/Erro registrado/)));
+  assert.equal(calls[0]!.id,calls[1]!.id);assert.equal(data.questions.length,0);
+});
+
+test('Plano: navegação de seções mantém os ajustes da rotina e dá acesso direto à agenda',()=>{
+  const active={contextId:'ctx',start:new Date('2020-01-01'),end:new Date('2099-01-01')};
+  render(<Settings data={{...data,rotations:[active],contexts:[{id:'ctx',title:'MFC'}],rules:[{weekday:1,starts_local:'18:00',ends_local:'20:00',daily_cap_minutes:60,minimum_session_minutes:5,max_effort:'high'}]}} onSaved={async()=>{}}/>);
+  assert(screen.getByRole('region',{name:'Disponibilidade dos próximos sete dias'}));
+  fireEvent.click(screen.getByRole('button',{name:'Rotina'}));
+  fireEvent.change(screen.getByRole('slider',{name:'Limite Segunda'}),{target:{value:'45'}});
+  fireEvent.click(screen.getByRole('button',{name:'Agenda Google'}));
+  assert(screen.getByRole('region',{name:'Google Calendar'}));
+  fireEvent.click(screen.getByRole('button',{name:'Rotina'}));
+  assert.equal((screen.getByRole('slider',{name:'Limite Segunda'}) as HTMLInputElement).value,'45');
+});
+
+test('Competência: ajuste altera parâmetros sem substituir o estado de memória',async()=>{
+  const {CompetencyEditor}=await import('../web/components/CompetencyEditor');let values:Record<string,unknown>={};
+  mock.method(supabase,'from',()=>({update:(v:Record<string,unknown>)=>{values=v;return{eq:()=>Promise.resolve({error:null})};}}));
+  render(<CompetencyEditor competency={data.competencies[0]!} onSaved={async()=>{}}/>);
+  fireEvent.click(screen.getByRole('button',{name:'Ajustar competência'}));
+  fireEvent.change(screen.getByLabelText('Importância'),{target:{value:'1'}});fireEvent.click(screen.getByRole('button',{name:'Salvar ajustes'}));
+  await waitFor(()=>assert(screen.getByText(/Histórico e memória preservados/)));assert.equal(values.importance,1);assert.equal('card' in values,false);
+});

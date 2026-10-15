@@ -94,7 +94,7 @@ test('Migrations: PostgreSQL, RLS entre dois usuários, grants e FKs compostas',
     await assert.rejects(db.exec(`insert into study_areas(user_id,title) values ('${b}','Invasão')`), /row-level security/);
     await assert.rejects(db.exec(`insert into topics(user_id,area_id,title) values ('${a}','${id(1, 2)}','Vínculo cruzado')`), /foreign key/);
     await assert.rejects(db.exec('select * from private.calendar_credentials'), /permission denied/);
-    for (const { tablename } of tables.filter(t => !editable.includes(t.tablename))) {
+    for (const { tablename } of tables.filter(t => !editable.includes(t.tablename)&&t.tablename!=='mistakes')) {
       await assert.rejects(db.exec(`delete from ${tablename} where user_id = '${a}'`), /permission denied/);
       await assert.rejects(db.exec(`update ${tablename} set user_id = user_id`), /permission denied/);
       await assert.rejects(db.exec(`insert into ${tablename} default values`), /permission denied/);
@@ -175,6 +175,23 @@ test('Migrations: PostgreSQL, RLS entre dois usuários, grants e FKs compostas',
     await db.query('update competencies set resource_url=$1 where id=$2',['https://www.notion.so/material',id(3)]);
     await assert.rejects(db.query('update competencies set resource_url=$1 where id=$2',['javascript:alert(1)',id(3)]),/check constraint/);
     assert.equal((await db.query<{resource_url:string}>('select resource_url from competencies where id=$1',[id(3)])).rows[0]!.resource_url,'https://www.notion.so/material');
+    // Novas entradas preservam tenant, idempotência, vínculos e rodízios futuros.
+    await db.exec(`insert into mistakes(id,user_id,competency_id,description,occurred_at) values ('${id(301)}','${a}','${id(3)}','Confundi os critérios',now());`);
+    await db.exec(`update mistakes set resolved_at=now() where id='${id(301)}';`);
+    await assert.rejects(db.exec(`update mistakes set user_id='${b}' where id='${id(301)}'`),/row-level security/);
+    await assert.rejects(db.exec(`insert into mistakes(user_id,competency_id,description,occurred_at) values ('${a}','${id(3,2)}','Cruzado',now())`),/foreign key/);
+    const eventArgs=['exam',id(302),'Prova final','2027-02-10T20:00:00Z',null,[id(3)]];
+    await db.query('select save_academic_event($1,$2,$3,$4,$5,$6::uuid[])',eventArgs);
+    await db.query('select save_academic_event($1,$2,$3,$4,$5,$6::uuid[])',eventArgs);
+    assert.equal((await db.query<{n:number}>(`select count(*)::int n from exam_competencies where exam_id='${id(302)}'`)).rows[0]!.n,1);
+    await assert.rejects(db.query('select save_academic_event($1,$2,$3,$4,$5,$6::uuid[])',['exam',id(303),'Cruzado','2027-02-10',null,[id(3,2)]]),/INVALID_COMPETENCY/);
+    assert.equal((await db.query(`select id from exams where id='${id(303)}'`)).rows.length,0);
+    await db.query('select save_academic_event($1,$2,$3,$4,$5,$6::uuid[])',['rotation',id(304),'Próximo contexto','2099-02-01T00:00:00Z','2099-03-01T00:00:00Z',[id(3)]]);
+    await db.query('select configure_study($1,$2,$3,$4::jsonb)',['Meta','America/Bahia','Contexto atual',JSON.stringify(Array.from({length:7},(_,weekday)=>({weekday,start:'18:00',end:'20:00',minutes:60,effort:'high'})))]);
+    assert.equal((await db.query<{ends_at:Date}>(`select ends_at from rotations where id='${id(304)}'`)).rows[0]!.ends_at.toISOString(),'2099-03-01T00:00:00.000Z');
+    await db.exec('reset role;set role anon;');
+    await assert.rejects(db.query('select save_academic_event($1,$2,$3,$4,$5,$6::uuid[])',eventArgs),/permission denied/);
+    await db.exec(`reset role;set role authenticated;select set_config('request.jwt.claim.sub','${a}',false);`);
     await db.exec(`reset role; delete from auth.users where id = '${a}';`);
     for (const { tablename } of tables) {
       const remaining = (await db.query<{ user_id: string }>(`select user_id from ${tablename}`)).rows;
