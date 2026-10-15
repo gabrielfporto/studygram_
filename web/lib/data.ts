@@ -2,11 +2,11 @@ import { z } from 'zod';
 import { supabase } from './client';
 import { newMemory } from '../../src/engine/memory';
 import { deserializeCard } from '../../src/application/session';
-import { validateCompetency } from '../../src/domain/model';
+import { validateCompetency, notionSourceSchema } from '../../src/domain/model';
 
 const named = z.object({ id: z.string(), title: z.string() });
 const competency = named.extend({ topic_id: z.string(), importance: z.coerce.number(), manual_priority: z.coerce.number(),
-  new_minutes: z.number(), review_minutes: z.number(), effort: z.enum(['low','medium','high']), archived: z.boolean() });
+  new_minutes: z.number(), review_minutes: z.number(), effort: z.enum(['low','medium','high']), archived: z.boolean(), notion_source: notionSourceSchema.nullable().optional() });
 const question = z.object({ competency_id: z.string(), total: z.number(), correct: z.number(), occurred_at: z.string() });
 const session = z.object({ id: z.string(), competency_id: z.string(), actual_minutes: z.number(), started_at: z.string(), ended_at: z.string().nullable(),
   status: z.string(), method: z.string(), feedback: z.number().nullable() });
@@ -51,7 +51,7 @@ export async function loadData(userId: string) {
     return validateCompetency({ id: c.id, userId, topicId: c.topic_id, area: area?.title ?? 'Área', topic: topic?.title ?? 'Tema', title: c.title,
       contextIds: (links.data ?? []).filter(l => l.competency_id === c.id).map(l => l.context_id), importance: c.importance,
       manualPriority: c.manual_priority, newMinutes: c.new_minutes, reviewMinutes: c.review_minutes, effort: c.effort,
-      archived: c.archived, card: review ? deserializeCard(review.card) : newMemory(now), evidence: ev });
+      archived: c.archived, notionSource: c.notion_source ?? null, card: review ? deserializeCard(review.card) : newMemory(now), evidence: ev });
   });
   return { profile: safeProfile, areas, topics, competencies: models, sessions, questions, rules, contexts,
     rotations: rotations.map(r => ({ contextId: r.context_id, start: new Date(r.starts_at), end: new Date(r.ends_at) })) };

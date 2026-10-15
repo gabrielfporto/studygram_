@@ -34,6 +34,7 @@ O Vite serve `/studygram_/`. URL/chave publicável do Supabase estão no cliente
 - Plano diário explicável com ajuste rápido de tempo, limites e seleção por valor/tempo.
 - Registro de estudo externo, sessões completas/parciais/não realizadas e questões.
 - FSRS no servidor; leitura passiva não altera memória.
+- Importação do Notion por CSV ou tabela colada, com prévia, mapeamento, duplicatas e histórico preservado. [Como importar](docs/notion-import.md).
 - Gravação atômica, idempotência e controle de versão entre dispositivos.
 - Progresso: retenção estimada, questões, cobertura e competências em risco.
 - Migrations: 21 tabelas públicas, uma privada, RLS, índices e constraints.

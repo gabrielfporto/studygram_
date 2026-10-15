@@ -31,7 +31,8 @@ function alternatives(c: Competency, p: Priority, maxEffort: Effort, minimum: nu
     competencyId: c.id, method, minutes, priority: p, utility: p.score * gain,
     expectedValuePerMinute: p.score * gain / minutes,
   });
-  if (!c.card.reps) return maxEffort === 'high' ? [make(c.newMinutes, 'new', 1.4)].filter(a => a.minutes >= minimum) : [];
+  const importedStudy = c.notionSource && (c.notionSource.studied || c.notionSource.questions || c.notionSource.retrieval);
+  if (!c.card.reps && !importedStudy) return maxEffort === 'high' ? [make(c.newMinutes, 'new', 1.4)].filter(a => a.minutes >= minimum) : [];
   const result: Activity[] = [];
   // Recuperação breve é de baixo esforço; abordagem completa respeita o esforço do conteúdo.
   result.push(make(10, 'recall', 0.65));

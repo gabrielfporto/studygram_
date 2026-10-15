@@ -118,6 +118,32 @@ test('Migrations: PostgreSQL, RLS entre dois usuários, grants e FKs compostas',
     assert.equal(imported.rows.length,1);
     await assert.rejects(db.query('select configure_study($1,$2,$3,$4::jsonb)', ['Erro','Fuso/Invalido','MFC',JSON.stringify(rules)]));
     const saved = await db.query<{goal:string}>('select goal from profiles'); assert.equal(saved.rows[0]!.goal,'Internato');
+    const row = {area:'MFC',topic:'Infectologia',title:'Hanseníase',importance:.95,
+      source:{status:'Iniciado',nextStudy:'2026-10-06',priming:true,studied:true,questions:false,retrieval:false,rotation:'MFC, MFC',originalImportance:'Alta',preserveDate:true}};
+    const importBatch = (items:unknown[]) => db.query<{import_schedule:{inserted:number;skipped:number}}>('select import_schedule($1::jsonb)',[JSON.stringify(items)]);
+    const batch = await importBatch([row,{...row,title:'Arboviroses'}]);
+    assert.deepEqual(batch.rows[0]!.import_schedule,{inserted:2,skipped:0});
+    const repeated = await importBatch([{...row,area:' mfc ',title:'hanseniase'}]);
+    assert.deepEqual(repeated.rows[0]!.import_schedule,{inserted:0,skipped:1});
+    const history = await db.query<{notion_source:typeof row.source}>("select notion_source from competencies where title='Hanseníase'");
+    assert.deepEqual(history.rows[0]!.notion_source,row.source);
+    assert.equal((await db.query("select * from reviews r join competencies c on r.competency_id=c.id where c.notion_source is not null")).rows.length,0);
+    assert.equal((await db.query("select * from study_sessions s join competencies c on s.competency_id=c.id where c.notion_source is not null")).rows.length,0);
+    assert.equal((await db.query("select * from competency_contexts cc join competencies c on c.id=cc.competency_id where c.notion_source is not null")).rows.length,2);
+    await assert.rejects(importBatch([{...row,title:'Não persistir'},{...row,title:'Data ruim',source:{...row.source,nextStudy:'2026-02-31'}}]));
+    assert.equal((await db.query("select * from competencies where title='Não persistir'")).rows.length,0);
+    await assert.rejects(importBatch([{...row,importance:4}]));
+    await assert.rejects(importBatch([{...row,source:{...row.source,studied:'yes'}}]));
+    await db.exec(`reset role; set role authenticated; select set_config('request.jwt.claim.sub','${b}',false);`);
+    assert.equal((await db.query("select * from competencies where notion_source is not null")).rows.length,0);
+    assert.equal((await importBatch([row])).rows[0]!.import_schedule.inserted,1);
+    // Remove only the extra B fixture so the existing account-deletion assertions stay exact.
+    await db.exec(`reset role; delete from competency_contexts where user_id='${b}' and competency_id in(select id from competencies where notion_source is not null);
+      delete from competencies where user_id='${b}' and notion_source is not null;
+      delete from topics where user_id='${b}' and title='Infectologia'; delete from study_areas where user_id='${b}' and title='MFC';
+      delete from academic_contexts where user_id='${b}' and title='MFC'; set role anon;`);
+    await assert.rejects(importBatch([row]),/permission denied/);
+    await db.exec(`reset role; set role authenticated; select set_config('request.jwt.claim.sub','${a}',false);`);
     const input: SessionInput = { competencyId:id(3),idempotencyKey:id(90),actualMinutes:20,plannedMinutes:20,
       startedAt:'2026-10-15T15:10:00Z',endedAt:'2026-10-15T15:30:00Z',method:'recall',status:'completed',feedback:3,total:10,correct:8,notes:'' };
     const memory=prepareReview(input,null,[],new Date(input.endedAt));

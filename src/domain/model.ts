@@ -17,13 +17,16 @@ export const evidenceSchema = z.object({
 }).refine(e => e.correct <= e.total && e.errors <= e.total && e.recurringErrors <= e.errors,
   'Evidência incompatível com o total de tentativas');
 export type Evidence = z.infer<typeof evidenceSchema>;
+export const notionSourceSchema = z.object({ status: z.string(), nextStudy: z.string().date().nullable(),
+  priming: z.boolean(), studied: z.boolean(), questions: z.boolean(), retrieval: z.boolean(),
+  rotation: z.string(), originalImportance: z.string(), preserveDate: z.boolean() });
 export const competencySchema = z.object({
   id: z.string().min(1), userId: z.string().min(1), topicId: z.string().min(1),
   area: z.string().min(1), topic: z.string().min(1), title: z.string().min(1),
   contextIds: z.array(z.string()), importance: unit, manualPriority: unit.default(0),
   newMinutes: z.number().int().min(25).max(90), reviewMinutes: z.number().int().min(10).max(45),
   effort: effortSchema, card: cardSchema, evidence: z.array(evidenceSchema),
-  lastExposure: z.date().optional(), archived: z.boolean().default(false),
+  lastExposure: z.date().optional(), archived: z.boolean().default(false), notionSource: notionSourceSchema.nullable().optional(),
 });
 export type Competency = Omit<z.infer<typeof competencySchema>, 'card'> & { card: Card };
 export interface Rotation { contextId: string; start: Date; end: Date }

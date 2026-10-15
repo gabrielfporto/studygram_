@@ -56,7 +56,8 @@ export function priority(c: Competency, context: Context, custom: Weights = defa
   const contributions = { ...defaultWeights, manual: c.manualPriority * 10 };
   for (const key of Object.keys(weights) as (keyof Weights)[]) contributions[key] = factors[key] * weights[key] / sum * 100;
   const reasons: string[] = [];
-  if (r === null) reasons.push('Competência ainda não estudada');
+  if (r === null) reasons.push(c.notionSource && (c.notionSource.studied || c.notionSource.questions || c.notionSource.retrieval)
+    ? 'Estudo informado no Notion · valide com uma recuperação' : 'Competência ainda não estudada');
   else if (memory >= 0.35) reasons.push(`Revisão necessária · ${Math.round(r * 100)}% de retenção estimada`);
   if (factors.weakness > 0.45) reasons.push('Dificuldade e erros recentes');
   if (relevance === 1) reasons.push('Relevante para o contexto atual');

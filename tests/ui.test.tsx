@@ -17,6 +17,8 @@ const { render, screen, fireEvent, cleanup, waitFor } = await import('@testing-l
 const { Today } = await import('../web/components/Today');
 const { Settings } = await import('../web/components/Settings');
 const { Contents } = await import('../web/components/Contents');
+const { NotionImport } = await import('../web/components/NotionImport');
+const { makePlan } = await import('../web/lib/planning');
 const { Progress } = await import('../web/components/Progress');
 const { SessionForm } = await import('../web/components/SessionForm');
 const { supabase } = await import('../web/lib/client');
@@ -74,4 +76,37 @@ test('Progresso: ausência de evidência não fabrica taxa de acerto',()=>{
   render(<Progress data={{...data,competencies:[]}} now={START}/>);
   assert(screen.getByText('Ainda sem evidência objetiva'));
   assert(screen.getByText('Registre uma recuperação para começar'));
+});
+
+test('Notion: prévia, seleção, falha e retry só gravam os assuntos confirmados',async()=>{
+  const calls:unknown[][]=[]; let refreshed=false;
+  mock.method(supabase,'rpc',(...args:unknown[])=>{calls.push(args);return Promise.resolve(calls.length===1 ? {data:null,error:{message:'offline'}} : {data:{inserted:1,skipped:0},error:null});});
+  render(<NotionImport data={{...data,competencies:[]}} onSaved={async()=>{refreshed=true;}} onClose={()=>{}}/>);
+  fireEvent.change(screen.getByLabelText('Tabela com cabeçalho'),{target:{value:'Área,Tema,Assunto,Próximo Estudo,Estudo\nMFC,Inf,Arbo,06/10/2026,Yes\nMFC,Inf,Hans,,No\nMFC,Inf,Arbo,,Yes\nMFC,Inf,Inválido,31/02/2026,Yes'}});
+  fireEvent.click(screen.getByRole('button',{name:'Preparar prévia'}));
+  assert.equal(calls.length,0);
+  assert.equal((screen.getByLabelText('Importar linha 4') as HTMLInputElement).disabled,true);
+  assert.equal((screen.getByLabelText('Importar linha 5') as HTMLInputElement).disabled,true);
+  fireEvent.click(screen.getByLabelText('Importar linha 3'));
+  fireEvent.change(screen.getByLabelText('Organização do cronograma'),{target:{value:'preserve'}});
+  fireEvent.click(screen.getByRole('button',{name:'Confirmar importação de 1 assunto(s)'}));
+  await waitFor(()=>assert(screen.getByRole('alert')));
+  assert.equal(refreshed,false);
+  fireEvent.click(screen.getByRole('button',{name:'Confirmar importação de 1 assunto(s)'}));
+  await waitFor(()=>assert(screen.getByText('1 assunto(s) importado(s).')));
+  assert.equal(calls.length,2);
+  const payload=calls[1]![1] as {p_rows:{title:string;source:{preserveDate:boolean}}[]};
+  assert.equal(payload.p_rows.length,1); assert.equal(payload.p_rows[0]!.title,'Arbo'); assert.equal(payload.p_rows[0]!.source.preserveDate,true);
+  fireEvent.click(screen.getByRole('button',{name:'Ver meus conteúdos →'})); await waitFor(()=>assert(refreshed));
+});
+
+test('Notion: data inicial respeita fuso local; sessão real libera o acompanhamento',()=>{
+  const c = {...data.competencies[0]!,notionSource:{status:'Iniciado',nextStudy:'2026-10-16',priming:false,studied:true,questions:false,retrieval:false,rotation:'MFC',originalImportance:'',preserveDate:true}};
+  const imported={...data,competencies:[c]};
+  const now=new Date('2026-10-16T01:00:00Z'); // ainda 15/10 na Bahia
+  assert.equal(makePlan(imported,c.userId,now,60).plan.items.length,0);
+  assert.equal(makePlan(imported,c.userId,new Date('2026-10-16T13:00:00Z'),60).plan.items.length,1);
+  assert.equal(makePlan({...imported,competencies:[{...c,notionSource:{...c.notionSource,preserveDate:false}}]},c.userId,now,60).plan.items.length,1);
+  const sessions=[{id:'s',competency_id:c.id,actual_minutes:10,started_at:'2026-10-14T15:00:00Z',ended_at:'2026-10-14T15:10:00Z',status:'completed',method:'recall',feedback:3}];
+  assert.equal(makePlan({...imported,sessions},c.userId,now,60).plan.items.length,1);
 });
