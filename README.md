@@ -40,7 +40,7 @@ O Vite serve `/studygram_/`. URL/chave publicável do Supabase estão no cliente
 - Gravação atômica, idempotência e controle de versão entre dispositivos.
 - Progresso: retenção estimada, questões, cobertura e competências em risco.
 - Migrations: 21 tabelas públicas, uma privada, RLS, índices e constraints.
-- Assistente de IA com prévia para registro, competências, erros e recuperação baseada em trecho; [ativação e limites](docs/ai.md). A ativação real depende da configuração JWT aprovada.
+- Assistente de IA ativo, com prévia para registro, competências, erros e recuperação baseada em trecho; [configuração, limites e validação](docs/ai.md). Geração real de organização de conteúdo validada em produção.
 - Testes de domínio, PostgreSQL e interação; workflow de validação/publicação.
 
 ## Documentação e limites

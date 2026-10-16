@@ -19,7 +19,7 @@ Cada ação é explícita; nada é gerado ao abrir a página. Mudar de ação de
 - `AI_MODEL_SIMPLE`: nome do modelo da conta OpenAI. Padrão da entrega: `gpt-5.6-terra`. Trocar essa variável não exige mudança de código. Não há rota automática para modelo mais caro. `AI_MODEL_COMPLEX` permanece reservado para uma evolução futura.
 - `npm run build:edge`: gera os bundles de `study-session` e `study-ai`; publicar somente a função alterada.
 
-**Estado de ativação:** código e migration publicados; a configuração `Verify JWT with legacy secret` da nova função permanece ligada. A revisão automática rejeitou desligá-la sem autorização específica. O código faz validação remota de sessão pelo Supabase Auth, mas a alteração dessa configuração precisa de aprovação antes do teste real completo. Não foi contornada por headers alternativos ou outra rota.
+**Estado de ativação:** código e migration publicados, função ativa e consulta real validada em 15/10/2026. Após autorização explícita do usuário, `Verify JWT with legacy secret` foi desligada somente em `study-ai`. A autenticação continua obrigatória por `auth.getUser` no código; uma chamada sem sessão retornou HTTP 401 após a alteração.
 
 ## Limites de uso e cache
 
@@ -45,6 +45,8 @@ Dados de pacientes não devem ser enviados. As perguntas são apoio ao estudo do
 
 ## Validação
 
-Testes de contrato/provedor com transporte simulado, autenticação e posse no handler, PostgreSQL local com RLS/cotas/cache, confirmação antes de gravar, campos desconhecidos e tentativa antes de revelar resposta. O teste com a OpenAI real e a confirmação de funcionamento em produção permanecem pendentes da configuração JWT e de uma sessão autenticada na aba do app.
+65 testes automatizados aprovados, incluindo contrato/provedor com transporte simulado, autenticação e posse no handler, PostgreSQL local com RLS/cotas/cache, confirmação antes de gravar, campos desconhecidos e tentativa antes de revelar resposta. Typecheck, simulações e build aprovados.
+
+Em produção, uma sessão autenticada gerou uma sugestão real de organização do ciclo da água em quatro competências usando `gpt-5.6-terra`. A prévia editável foi exibida e a reserva de uso terminou como `completed`, com 223 tokens de entrada e 67 de saída. A importação não foi confirmada: nenhum conteúdo de teste foi adicionado ao cronograma. Esse teste valida o caminho completo de geração; os demais fluxos têm cobertura automatizada, sem afirmar que todos foram exercitados com o provedor real.
 
 Documentação oficial: [Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs), [modelo padrão](https://developers.openai.com/api/docs/models/gpt-5.6-terra), [secrets do Supabase](https://supabase.com/docs/guides/functions/secrets).
