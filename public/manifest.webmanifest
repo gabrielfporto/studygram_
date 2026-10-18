@@ -1,0 +1,16 @@
+{
+  "id": "./",
+  "name": "Studygram",
+  "short_name": "Studygram",
+  "description": "Seu estudo, no tempo que você tem.",
+  "lang": "pt-BR",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "theme_color": "#a8b2ff",
+  "background_color": "#111318",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
