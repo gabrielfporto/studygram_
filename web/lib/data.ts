@@ -9,7 +9,7 @@ const named = z.object({ id: z.string(), title: z.string() });
 const competency = named.extend({ topic_id: z.string(), importance: z.coerce.number(), manual_priority: z.coerce.number(),
   new_minutes: z.number(), review_minutes: z.number(), effort: z.enum(['low','medium','high']), archived: z.boolean(), notion_source: notionSourceSchema.nullable().optional(), resource_url:z.string().nullable().optional() });
 const question = z.object({ competency_id: z.string(), total: z.number(), correct: z.number(), occurred_at: z.string(), session_id:z.string().nullable().optional() });
-const session = z.object({ id: z.string(), competency_id: z.string(), actual_minutes: z.number(), started_at: z.string(), ended_at: z.string().nullable(),
+const session = z.object({ id: z.string(), competency_id: z.string(), actual_minutes: z.number(), planned_minutes:z.number().nullable().optional(), started_at: z.string(), ended_at: z.string().nullable(),
   status: z.string(), method: z.string(), feedback: z.number().nullable(), notes:z.string().nullable().optional() });
 export const ruleSchema = z.object({ weekday: z.number(), starts_local: z.string(), ends_local: z.string(), daily_cap_minutes: z.number(),
   minimum_session_minutes: z.number(), max_effort: z.enum(['low','medium','high']) });

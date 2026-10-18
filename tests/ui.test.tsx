@@ -86,6 +86,20 @@ test('Progresso: ausência de evidência não fabrica taxa de acerto',()=>{
   assert(screen.getByText('Registre uma recuperação para começar'));
 });
 
+test('Progresso: Diagnóstico abre ações explícitas e bloqueia outra sessão quando há uma em andamento',()=>{
+  const id=data.competencies[0]!.id;let action:unknown=null;
+  const sessions=[1,2].map(n=>({id:String(n),competency_id:id,actual_minutes:5,started_at:START.toISOString(),ended_at:START.toISOString(),status:'completed',method:'recall',feedback:1}));
+  const props={data:{...data,sessions},now:START,onDiagnosticAction:(a:unknown)=>{action=a;}};
+  const view=render(<Progress {...props}/>);
+  fireEvent.click(screen.getByRole('button',{name:'Diagnóstico'}));
+  assert.equal(action,null);
+  fireEvent.click(screen.getByRole('button',{name:'Iniciar recuperação de 5 min'}));
+  assert.deepEqual(action,{kind:'recall',competencyId:id});
+  view.rerender(<Progress {...props} diagnosticDisabled/>);
+  assert.equal((screen.getByRole('button',{name:'Iniciar recuperação de 5 min'}) as HTMLButtonElement).disabled,true);
+  fireEvent.click(screen.getByRole('button',{name:'Visão geral'}));assert(screen.getByText('Retenção estimada'));
+});
+
 test('Notion: prévia, seleção, falha e retry só gravam os assuntos confirmados',async()=>{
   const calls:unknown[][]=[]; let refreshed=false;
   mock.method(supabase,'rpc',(...args:unknown[])=>{calls.push(args);return Promise.resolve(calls.length===1 ? {data:null,error:{message:'offline'}} : {data:{inserted:1,skipped:0},error:null});});

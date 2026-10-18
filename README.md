@@ -41,6 +41,7 @@ O Vite serve `/studygram_/`. URL/chave publicável do Supabase estão no cliente
 - Progresso: retenção estimada, questões, cobertura e competências em risco.
 - Migrations: 21 tabelas públicas, uma privada, RLS, índices e constraints.
 - Assistente de IA ativo, com prévia para registro, competências, erros e recuperação baseada em trecho; [configuração, limites e validação](docs/ai.md). Geração real de organização de conteúdo validada em produção.
+- [Diagnóstico de estudo](docs/diagnosis.md) em Progresso: evidências dos últimos 14 dias e até três ações práticas, sem confundir ausência de registro com ausência de estudo.
 - Testes de domínio, PostgreSQL e interação; workflow de validação/publicação.
 
 ## Documentação e limites
