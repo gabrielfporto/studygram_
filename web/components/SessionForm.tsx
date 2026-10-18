@@ -39,11 +39,11 @@ export function SessionForm({ competencies, initialId, minutes, method, onSave, 
   return <dialog ref={dialog} onCancel={e => { if (busy) e.preventDefault(); else onClose(); }} aria-labelledby="session-title">
     <div className="dialog-head"><div><p className="eyebrow">REGISTRAR PRÁTICA</p><h2 id="session-title">Como foi o estudo?</h2></div><button disabled={busy} className="secondary" onClick={onClose}>Fechar</button></div>
     <p className="muted">Estude no seu material e registre o resultado aqui. Não é necessário manter esta janela aberta.</p>
-    {userId&&!prefill&&<DraftNotice saved={draft.saved} failed={draft.failed} onDiscard={()=>{if(draft.clear())onClose();}}/>}
+    {userId&&!prefill&&<DraftNotice disabled={busy} saved={draft.saved} failed={draft.failed} onDiscard={()=>{if(draft.clear())onClose();}}/>}
     {!locked&&<p className="caption">Horário do registro: {draft.value.timezone}. Confira a data ao retomar um rascunho.</p>}
     {prefill&&<p className="notice">Sugestão da IA: confira competência, duração, data e acertos. Campos não identificados precisam ser preenchidos.{prefill.dateHint?` Data mencionada: ${prefill.dateHint}. Ajuste o término abaixo.`:''}</p>}
     {locked && <p className="caption">Confira o tempo efetivo. Escolha “Concluí esta etapa” apenas se terminou o objetivo; o timer não conclui a etapa por você.</p>}
-    <form onSubmit={submit}><CompetencyPicker competencies={competencies} value={selected} onChange={setSelected} disabled={locked||busy}/>
+    <form onSubmit={submit}><fieldset disabled={busy} className="form-fields"><CompetencyPicker competencies={competencies} value={selected} onChange={setSelected} disabled={locked||busy}/>
       {!locked&&<label>Quando terminou o estudo?<input type="datetime-local" required value={endedLocal} onChange={e=>setEndedLocal(e.target.value)}/></label>}
       <div className="form-grid"><label>Resultado<select value={status} onChange={e => setStatus(e.target.value as typeof status)}><option value="completed">Concluí esta etapa</option><option value="partial">Avancei, vou retomar</option><option value="missed">Não realizado</option></select></label>
       <label>Tempo real (min)<input type="number" min={1} max={720} required disabled={status === 'missed'} value={duration} onChange={e => setDuration(Number(e.target.value))}/></label></div>
@@ -57,5 +57,5 @@ export function SessionForm({ competencies, initialId, minutes, method, onSave, 
       <label>Onde parou ou o que precisa retomar? (opcional)<textarea maxLength={4000} rows={2} placeholder="Ex.: parei na página 12; quero revisar o diagnóstico diferencial." value={notes} onChange={e => setNotes(e.target.value)}/></label>
       {error && <p className="notice error" role="alert">{error}</p>}
       <button disabled={busy} className="primary full">{busy ? 'Salvando…' : 'Salvar e atualizar meu plano'}</button>
-    </form></dialog>;
+    </fieldset></form></dialog>;
 }
