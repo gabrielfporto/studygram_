@@ -100,6 +100,27 @@ test('Progresso: Diagnóstico abre ações explícitas e bloqueia outra sessão 
   fireEvent.click(screen.getByRole('button',{name:'Visão geral'}));assert(screen.getByText('Retenção estimada'));
 });
 
+test('Rascunho de registro: remonta com campos e idempotência preservados; salva só após confirmação e limpa',async()=>{
+  const ids:string[]=[];const props={userId:'draft-user',competencies:data.competencies,initialId:data.competencies[0]!.id,minutes:20,method:'reading' as const,onClose:()=>{},onSave:async(input:import('../src/application/session').SessionInput)=>{ids.push(input.idempotencyKey);if(ids.length===1)throw new Error('offline');}};
+  const view=render(<SessionForm {...props}/>);
+  fireEvent.change(screen.getByLabelText('Onde parou ou o que precisa retomar? (opcional)'),{target:{value:'Página 15'}});
+  fireEvent.change(screen.getByLabelText('Tempo real (min)'),{target:{value:'12'}});
+  fireEvent.click(screen.getByRole('button',{name:'Salvar e atualizar meu plano'}));await waitFor(()=>assert(screen.getByRole('alert')));
+  view.unmount();render(<SessionForm {...props} minutes={30}/>);
+  assert.equal((screen.getByLabelText('Tempo real (min)') as HTMLInputElement).value,'12');
+  assert.equal((screen.getByLabelText('Onde parou ou o que precisa retomar? (opcional)') as HTMLTextAreaElement).value,'Página 15');
+  assert.equal(ids.length,1);fireEvent.click(screen.getByRole('button',{name:'Salvar e atualizar meu plano'}));await waitFor(()=>assert.equal(ids.length,2));assert.equal(ids[0],ids[1]);
+  assert.equal(localStorage.getItem('studygram:draft:v1:draft-user:session'),null);
+});
+
+test('Rascunho de rotina: restaura mudanças, descarta explicitamente e não salva na conta ao editar',()=>{
+  const props={data:{...data,userId:'routine-user'},onSaved:async()=>{}};let calls=0;mock.method(supabase,'rpc',()=>{calls++;return Promise.resolve({data:null,error:null});});
+  const view=render(<Settings {...props}/>);
+  fireEvent.change(screen.getByLabelText('Limite Segunda'),{target:{value:'35'}});view.unmount();
+  render(<Settings {...props}/>);assert.equal((screen.getByLabelText('Limite Segunda') as HTMLInputElement).value,'35');assert.equal(calls,0);
+  fireEvent.click(screen.getByRole('button',{name:'Descartar rascunho'}));assert.equal((screen.getByLabelText('Limite Segunda') as HTMLInputElement).value,'60');assert.equal(localStorage.getItem('studygram:draft:v1:routine-user:routine'),null);
+});
+
 test('Notion: prévia, seleção, falha e retry só gravam os assuntos confirmados',async()=>{
   const calls:unknown[][]=[]; let refreshed=false;
   mock.method(supabase,'rpc',(...args:unknown[])=>{calls.push(args);return Promise.resolve(calls.length===1 ? {data:null,error:{message:'offline'}} : {data:{inserted:1,skipped:0},error:null});});

@@ -5,21 +5,22 @@ import { durationLabel, windowCapacity } from '../lib/duration';
 import { CalendarPanel } from './CalendarPanel';
 import { WeekOverview } from './WeekOverview';
 import { AcademicEvents } from './AcademicEvents';
+import { useLocalDraft,routineDraftSchema } from '../lib/local-draft';
+import { DraftNotice } from './DraftNotice';
 
 const weekdays = ['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
 export function Settings({ data, onSaved,initialSection }: { data: StudyData; onSaved: () => Promise<void>;initialSection?:'week'|'routine'|'calendar'|'events'|undefined }) {
-  const [goal, setGoal] = useState(data.profile?.goal ?? '');
-  const [timezone, setTimezone] = useState(data.profile?.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone);
   const active = data.rotations.find(r => r.start <= new Date() && r.end > new Date());
   const [view,setView]=useState(initialSection??(data.rules.length&&active?'week':'routine'));
-  const [context, setContext] = useState(data.contexts.find(c => c.id === active?.contextId)?.title ?? '');
-  const [rules, setRules] = useState(weekdays.map((_, weekday) => {
+  const draft=useLocalDraft(data.userId,'routine',routineDraftSchema,()=>({goal:data.profile?.goal??'',timezone:data.profile?.timezone??Intl.DateTimeFormat().resolvedOptions().timeZone,context:data.contexts.find(c=>c.id===active?.contextId)?.title??'',rules:weekdays.map((_, weekday) => {
     const r = data.rules.find(r => r.weekday === weekday);
     return { weekday, start: r?.starts_local.slice(0,5) ?? '18:00', end: r?.ends_local.slice(0,5) ?? '20:00', minutes: r?.daily_cap_minutes ?? (weekday === 0 ? 0 : 60), effort: r?.max_effort ?? 'high' };
-  }));
+  })}));
+  const {goal,timezone,context,rules}=draft.value;
+  const setGoal=(goal:string)=>draft.update({goal}),setTimezone=(timezone:string)=>draft.update({timezone}),setContext=(context:string)=>draft.update({context});
   const [busy, setBusy] = useState(false); const [message, setMessage] = useState('');
   function updateRule(index:number,patch:Partial<typeof rules[number]>) {
-    setRules(previous=>previous.map((r,i)=>{if(i!==index)return r;const next={...r,...patch};return {...next,minutes:Math.min(next.minutes,windowCapacity(next.start,next.end))};}));
+    draft.update({rules:rules.map((r,i)=>{if(i!==index)return r;const next={...r,...patch};return {...next,minutes:Math.min(next.minutes,windowCapacity(next.start,next.end))};})});
   }
   async function submit(e: FormEvent) {
     e.preventDefault(); setBusy(true); setMessage('');
@@ -27,12 +28,13 @@ export function Settings({ data, onSaved,initialSection }: { data: StudyData; on
       if (rules.some(r => r.end <= r.start)) throw new Error('O fim de cada janela deve ser posterior ao início.');
       const { error } = await supabase.rpc('configure_study', { p_goal: goal, p_timezone: timezone, p_context: context, p_rules: rules });
       if (error) throw error;
-      await onSaved(); setMessage('Rotina salva. Seu plano foi recalculado.');
+      draft.clear();await onSaved(); setMessage('Rotina salva. Seu plano foi recalculado.');
     } catch (err) { setMessage(err instanceof Error ? err.message : 'Não foi possível salvar a rotina.'); }
     finally { setBusy(false); }
   }
   return <><header className="page-header"><div><p className="eyebrow">UM PLANO QUE RESPEITA VOCÊ</p><h1>Seu ritmo, suas janelas.</h1><p className="muted">Defina os limites. As prioridades ficam por conta do motor.</p></div></header>
     <nav className="plan-sections" aria-label="Seções do plano">{[['week','Semana'],['routine','Rotina'],['calendar','Agenda Google'],['events','Provas e rodízios']].map(([key,label])=><button type="button" key={key} className={view===key?'primary':'secondary'} aria-pressed={view===key} onClick={()=>setView(key as typeof view)}>{label}</button>)}</nav>
+    {view==='routine'&&data.userId&&<DraftNotice saved={draft.saved} failed={draft.failed} onDiscard={draft.discard}/>}
     <div hidden={view!=='routine'}><form onSubmit={submit} className="settings-form"><details className="profile-settings" open={!data.profile||!data.profile.goal||!active}><summary>Objetivo, contexto e fuso{context?` · ${context}`:''}</summary><div className="form-grid"><label>Seu objetivo<input required maxLength={1000} placeholder="Ex.: consolidar os conteúdos do internato" value={goal} onChange={e => setGoal(e.target.value)}/></label><label>Contexto atual<input required maxLength={200} list="context-options" placeholder="Ex.: Emergência" value={context} onChange={e => setContext(e.target.value)}/></label><datalist id="context-options">{['MFC','Emergência','Clínica Médica','Pediatria','Cirurgia','Obstetrícia'].map(c => <option key={c}>{c}</option>)}</datalist></div>
       <label>Fuso horário<input required value={timezone} onChange={e => setTimezone(e.target.value)} placeholder="America/Bahia"/></label></details>
       <div className="section-title"><h2>Sua semana</h2><span className="caption">Até {durationLabel(rules.reduce((n,r)=>n+r.minutes,0))} na semana</span></div>

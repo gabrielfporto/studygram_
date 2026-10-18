@@ -1,0 +1,3 @@
+export function DraftNotice({saved,failed,onDiscard}:{saved:boolean;failed:boolean;onDiscard:()=>void}) {
+  return <div className="draft-notice"><p className="caption" role="status">{failed?'Não foi possível guardar o rascunho neste navegador. Mantenha esta tela aberta até salvar.':saved?'Rascunho guardado neste navegador por até 30 dias. Ainda não foi enviado ao seu histórico.':'Ao editar, um rascunho será guardado neste navegador por até 30 dias.'} Não sincroniza com outros dispositivos.</p>{saved&&<button type="button" className="text-button" onClick={onDiscard}>Descartar rascunho</button>}</div>;
+}

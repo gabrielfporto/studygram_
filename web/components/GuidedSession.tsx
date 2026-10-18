@@ -6,9 +6,9 @@ import { elapsedSeconds, togglePause, type StudyDraft } from '../lib/active-stud
 import { SessionForm } from './SessionForm';
 import { safeMaterialUrl } from '../lib/material';
 
-export function GuidedSession({ draft, competency, onChange, onSave, onHide, onDiscard }: {
+export function GuidedSession({ draft, competency, onChange, onSave, onHide, onDiscard,userId }: {
   draft:StudyDraft; competency:Competency; onChange:(draft:StudyDraft)=>void;
-  onSave:(input:SessionInput)=>Promise<void>; onHide:()=>void; onDiscard:()=>void;
+  onSave:(input:SessionInput)=>Promise<void>; onHide:()=>void; onDiscard:()=>void;userId?:string;
 }) {
   const dialog=useRef<HTMLDialogElement>(null); const [now,setNow]=useState(Date.now()); const [record,setRecord]=useState(false);
   const [continueAnyway,setContinueAnyway]=useState(false);
@@ -16,7 +16,7 @@ export function GuidedSession({ draft, competency, onChange, onSave, onHide, onD
   useEffect(()=>{const timer=setInterval(()=>setNow(Date.now()),1000);return()=>clearInterval(timer);},[]);
   const elapsed=elapsedSeconds(draft,now); const guide=instructions[draft.method];
   const material=safeMaterialUrl(competency.materialUrl); const remaining=Math.max(0,draft.minutes*60-elapsed);
-  if(record) return <SessionForm competencies={[competency]} initialId={competency.id} minutes={draft.minutes} method={draft.method}
+  if(record) return <SessionForm userId={userId} competencies={[competency]} initialId={competency.id} minutes={draft.minutes} method={draft.method}
     sessionKey={draft.id} startedAt={draft.startedAt} locked actualMinutes={Math.max(1,Math.min(720,Math.round(elapsed/60)))}
     initialStatus="partial" onSave={onSave} onClose={()=>setRecord(false)}/>;
   return <dialog ref={dialog} className="guided-session" onCancel={e=>{e.preventDefault();onHide();}} aria-labelledby="guided-title">

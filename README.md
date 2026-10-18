@@ -50,7 +50,7 @@ O Vite serve `/studygram_/`. URL/chave publicável do Supabase estão no cliente
 
 A simulação usa 50 temas/150 competências fictícias em três seeds; nenhuma fixture é inserida em produção. Testes de UI simulam respostas de transporte; testes SQL executam PostgreSQL local. O usuário confirmou o registro real de estudo e a autorização/sincronização do Google Calendar em produção.
 
-Provas/rodízios futuros, previsão semanal de capacidade, edição de competências e caderno de erros estão disponíveis. [Entrega das fases 0–3](docs/phases-0-3.md). Próximas evoluções: snapshots históricos do plano, sincronização em segundo plano, análise de desempenho por IA e offline. O plano atual é calculado no navegador a partir dos dados reais; a memória é atualizada no servidor. Ajustes rápidos de tempo e formulários não salvos não sobrevivem a recarregamento. Não há pagamentos.
+Provas/rodízios futuros, previsão semanal de capacidade, edição de competências e caderno de erros estão disponíveis. [Entrega das fases 0–3](docs/phases-0-3.md). A [primeira entrega da fase 5](docs/daily-validation.md) preserva rascunhos da rotina e do registro de estudo e guarda referências diárias do plano neste navegador, separadas por conta. Ajustes rápidos e os demais formulários ainda não sobrevivem a recarregamento. Próximas evoluções: sincronização em segundo plano, análise de desempenho por IA e offline. O plano atual é calculado no navegador a partir dos dados reais; a memória é atualizada no servidor. Não há pagamentos.
 
 ## Estrutura
 

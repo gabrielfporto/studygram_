@@ -1,6 +1,8 @@
 # Diagnóstico de estudo
 
-Disponível em **Progresso → Diagnóstico**. Usa regras locais, sem chamadas à IA, novos dados persistidos ou mudanças no FSRS. A janela inclui hoje e os 13 dias anteriores no fuso do perfil, excluindo registros futuros; usa o término da sessão quando disponível.
+Disponível em **Progresso → Diagnóstico**. Usa regras locais, sem chamadas à IA, novos dados enviados ao servidor ou mudanças no FSRS. A janela inclui hoje e os 13 dias anteriores no fuso do perfil, excluindo registros futuros; usa o término da sessão quando disponível.
+
+O painel também exibe as referências diárias do plano guardadas neste navegador, com comparação do estudo iniciado após cada captura. Não há referências retroativas, nem sincronização desses snapshots entre dispositivos. Consulte [validação diária](daily-validation.md) para o critério de comparação e os limites de armazenamento.
 
 Os indicadores mostram dias com prática, minutos, sessões parciais e tempo realizado versus previsto. A comparação de tempo inclui somente sessões com `planned_minutes` registrado; sessões manuais sem previsão não recebem uma duração inventada. Não compara o realizado com toda a disponibilidade ou com planos passados que não foram registrados. Sessões parciais não são interpretadas como interrupção, nem dias sem registro como ausência de estudo.
 

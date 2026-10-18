@@ -4,26 +4,25 @@ import type { SessionInput } from '../../src/application/session';
 import { Temporal } from '@js-temporal/polyfill';
 import type { LogProposal } from '../../src/application/ai';
 import { CompetencyPicker } from './CompetencyPicker';
+import { useLocalDraft,sessionDraftSchema } from '../lib/local-draft';
+import { DraftNotice } from './DraftNotice';
 
-export function SessionForm({ competencies, initialId, minutes, method, onSave, onClose, sessionKey, actualMinutes, initialStatus, locked=false, startedAt,prefill,timezone=Intl.DateTimeFormat().resolvedOptions().timeZone }: {
+export function SessionForm({ competencies, initialId, minutes, method, onSave, onClose, sessionKey, actualMinutes, initialStatus, locked=false, startedAt,prefill,userId,timezone=Intl.DateTimeFormat().resolvedOptions().timeZone }: {
   competencies: Competency[]; initialId: string; minutes: number; method: SessionInput['method'];
   onSave: (input: SessionInput) => Promise<void>; onClose: () => void;
-  prefill?:LogProposal; timezone?:string; sessionKey?:string; actualMinutes?:number; initialStatus?:SessionInput['status']; locked?:boolean; startedAt?:string;
+  prefill?:LogProposal; userId?:string|undefined; timezone?:string; sessionKey?:string; actualMinutes?:number; initialStatus?:SessionInput['status']; locked?:boolean; startedAt?:string;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
-  const [id] = useState(() => sessionKey ?? crypto.randomUUID());
-  const [selected, setSelected] = useState(initialId);
-  const [duration, setDuration] = useState(actualMinutes ?? (prefill?prefill.minutes??0:minutes));
-  const [studyMethod, setMethod] = useState<SessionInput['method']|''>(prefill?prefill.method??'':method);
-  const [status, setStatus] = useState<SessionInput['status']>(initialStatus ?? 'completed');
-  const [feedback, setFeedback] = useState(locked||prefill ? 0 : 3); const [total, setTotal] = useState(prefill?.total??0); const [correct, setCorrect] = useState(prefill?prefill.correct??-1:0);
-  const [notes, setNotes] = useState(prefill?.notes??''); const [endedLocal,setEndedLocal]=useState(()=>Temporal.Now.instant().toZonedDateTimeISO(timezone).toPlainDateTime().toString({smallestUnit:'minute'})); const [error, setError] = useState(''); const [busy, setBusy] = useState(false);
+  const draft=useLocalDraft(prefill?undefined:userId,locked?`session:${sessionKey}`:'session',sessionDraftSchema,()=>sessionDraftSchema.parse({id:sessionKey??crypto.randomUUID(),selected:initialId,duration:actualMinutes??(prefill?prefill.minutes??0:minutes),studyMethod:prefill?prefill.method??'':method,status:initialStatus??'completed',feedback:locked||prefill?0:3,total:prefill?.total??0,correct:prefill?prefill.correct??-1:0,notes:prefill?.notes??'',endedLocal:Temporal.Now.instant().toZonedDateTimeISO(timezone).toPlainDateTime().toString({smallestUnit:'minute'}),timezone}));
+  const {id,selected,duration,studyMethod,status,feedback,total,correct,notes,endedLocal}=draft.value;
+  const setSelected=(selected:string)=>draft.update({selected}),setDuration=(duration:number)=>draft.update({duration}),setMethod=(studyMethod:typeof draft.value.studyMethod)=>draft.update({studyMethod}),setStatus=(status:typeof draft.value.status)=>draft.update({status}),setFeedback=(feedback:number)=>draft.update({feedback}),setTotal=(total:number)=>draft.update({total}),setCorrect=(correct:number)=>draft.update({correct}),setNotes=(notes:string)=>draft.update({notes}),setEndedLocal=(endedLocal:string)=>draft.update({endedLocal});
+  const [error,setError]=useState(''),[busy,setBusy]=useState(false);
   useEffect(() => { dialog.current?.showModal(); }, []);
   async function submit(e: FormEvent) {
     e.preventDefault(); setBusy(true); setError('');
     const actual = status === 'missed' ? 0 : duration;
     try {
-      const endedAt=locked?new Date():new Date(Temporal.PlainDateTime.from(endedLocal).toZonedDateTime(timezone).epochMilliseconds);
+      const endedAt=locked?new Date():new Date(Temporal.PlainDateTime.from(endedLocal).toZonedDateTime(draft.value.timezone).epochMilliseconds);
       if(endedAt.getTime()>Date.now()+60000)throw new Error('O término não pode estar no futuro.');
       if(status!=='missed'&&total>0&&correct<0&&!['reading','priming'].includes(studyMethod))throw new Error('Informe quantas questões acertou.');
       if(!studyMethod)throw new Error('Escolha o método de estudo.');
@@ -33,13 +32,15 @@ export function SessionForm({ competencies, initialId, minutes, method, onSave, 
         startedAt: startedAt ?? new Date(endedAt.getTime() - actual * 60000).toISOString(), endedAt: endedAt.toISOString(),
         method: studyMethod, status, feedback:feedback || 3, total: status === 'missed' || ['reading','priming'].includes(studyMethod) ? 0 : total,
         correct: status === 'missed' || ['reading','priming'].includes(studyMethod) ? 0 : Math.max(0,correct), notes });
-      onClose();
+      draft.clear();onClose();
     } catch (err) { setError(err instanceof Error ? err.message : 'Não foi possível salvar. Tente novamente.'); }
     finally { setBusy(false); }
   }
   return <dialog ref={dialog} onCancel={e => { if (busy) e.preventDefault(); else onClose(); }} aria-labelledby="session-title">
     <div className="dialog-head"><div><p className="eyebrow">REGISTRAR PRÁTICA</p><h2 id="session-title">Como foi o estudo?</h2></div><button disabled={busy} className="secondary" onClick={onClose}>Fechar</button></div>
     <p className="muted">Estude no seu material e registre o resultado aqui. Não é necessário manter esta janela aberta.</p>
+    {userId&&!prefill&&<DraftNotice saved={draft.saved} failed={draft.failed} onDiscard={()=>{if(draft.clear())onClose();}}/>}
+    {!locked&&<p className="caption">Horário do registro: {draft.value.timezone}. Confira a data ao retomar um rascunho.</p>}
     {prefill&&<p className="notice">Sugestão da IA: confira competência, duração, data e acertos. Campos não identificados precisam ser preenchidos.{prefill.dateHint?` Data mencionada: ${prefill.dateHint}. Ajuste o término abaixo.`:''}</p>}
     {locked && <p className="caption">Confira o tempo efetivo. Escolha “Concluí esta etapa” apenas se terminou o objetivo; o timer não conclui a etapa por você.</p>}
     <form onSubmit={submit}><CompetencyPicker competencies={competencies} value={selected} onChange={setSelected} disabled={locked||busy}/>

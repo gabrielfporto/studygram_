@@ -133,7 +133,7 @@ Estrutura atual: `src/domain` (validação/tipos), `src/engine` (memória/priori
 | 2, entregue no escopo web | FSRS no fluxo do produto + recall + erros + progresso | recuperação persiste atomicamente, indicadores sem evidência falsa |
 | 3, entregue no escopo web | Google Calendar | autorização real validada pelo usuário; snapshot, fusos, conflitos, falhas e desconexão testados; atualização manual |
 | 4, núcleo entregue e ativo | IA estruturada | quatro fluxos com prévias, contexto mínimo, cotas e testes; geração real de organização de conteúdo validada |
-| 5 | refinamento / analytics / SaaS | acessibilidade, offline, carga e observabilidade |
+| 5, em andamento | refinamento / analytics / SaaS | diagnóstico, rascunhos e referências locais entregues; acessibilidade, offline, carga e observabilidade pendentes |
 
 O FSRS está integrado ao fluxo real. Erros específicos ficam em um caderno com busca, revisão/reabertura e influência limitada na prioridade; não criam questões fictícias. Progresso mostra quatro semanas de prática e questões, com ressalvas sobre amostras. Provas e rodízios são cadastrados com temas relacionados. A capacidade dos próximos sete dias é uma previsão; não simula aprendizado nem promete atividades futuras. Consulte `phases-0-3.md` para evidências e limites.
 
