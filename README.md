@@ -4,6 +4,8 @@ Aplicação web de estudos adaptativos. Interface em português, responsiva e co
 
 **Stack:** React + Vite + TypeScript, Supabase Auth/PostgreSQL/RLS e Edge Function para sessões. Publicação estática no GitHub Pages; núcleo independente para futura interface mobile.
 
+As [orientações de aprendizagem e seus limites](docs/learning-evidence.md) distinguem evidência científica de decisões ajustáveis do produto. O ciclo web prioriza objetivos delimitados, recuperação com conferência e continuidade, sem maximizar a quantidade de blocos curtos.
+
 ## Uso
 
 1. Criar conta, confirmar e-mail e entrar.

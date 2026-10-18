@@ -37,8 +37,8 @@ function alternatives(c: Competency, p: Priority, maxEffort: Effort, minimum: nu
     const step = nextStudyStep(c,input.now);
     if (!step.ready || (!input.startSmall && rank[step.effort] > rank[maxEffort])) return [];
     const minutes = input.startSmall ? 5 : step.minutes;
-    const gain = step.method==='priming' ? .15 : step.method==='reading' ? 1.4 : 1;
-    return minutes >= minimum ? [make(minutes,step.method,gain)] : [];
+    // Product scheduling priority, not a measured learning gain per minute.
+    return minutes >= minimum ? [make(minutes,step.method,1)] : [];
   }
   const importedStudy = c.notionSource && (c.notionSource.studied || c.notionSource.questions || c.notionSource.retrieval);
   if (!c.card.reps && !importedStudy) return maxEffort === 'high' ? [make(c.newMinutes, 'new', 1.4)].filter(a => a.minutes >= minimum) : [];
@@ -85,8 +85,22 @@ export function planDay(input: PlanInput): Plan {
   const groups = new Map(candidates.map(c => [c.id, alternatives(c, priority(c, input, input.weights), input.maxEffort, input.minimumSession,input)]));
   const items: PlanItem[] = [];
   let remaining = capacityMinutes;
+  let preparationCount=0;
   for (const window of freeWindows) {
-    const selected = choose([...groups.values()], Math.min(remaining, Math.floor((window.end - window.start) / MINUTE)), input.maximumSessions - items.length)
+    const windowCapacity=Math.min(remaining, Math.floor((window.end - window.start) / MINUTE));
+    let selected:Activity[];
+    if(input.useStudyCycle){
+      // Avoid maximizing the count of cheap activities. Select by priority with
+      // a deliberate product limit on context changes, respecting real windows.
+      selected=[];let available=windowCapacity;
+      const options=[...groups.values()].flat().sort((a,b)=>Number(a.method==='priming')-Number(b.method==='priming')||b.priority.score-a.priority.score||a.competencyId.localeCompare(b.competencyId));
+      for(const option of options){
+        if(items.length+selected.length>=Math.min(input.maximumSessions,input.startSmall?1:3))break;
+        if(option.minutes>available||(option.method==='priming'&&preparationCount>=1))continue;
+        selected.push(option);available-=option.minutes;if(option.method==='priming')preparationCount++;
+      }
+    }else selected=choose([...groups.values()],windowCapacity,input.maximumSessions-items.length);
+    selected=selected
       .sort((a, b) => b.priority.score - a.priority.score || (a.competencyId < b.competencyId ? -1 : 1));
     let cursor = window.start;
     for (const activity of selected) {
@@ -96,7 +110,7 @@ export function planDay(input: PlanInput): Plan {
       groups.delete(activity.competencyId);
     }
   }
-  return { version: ENGINE_VERSION+(input.useStudyCycle?'/cycle-1':''), capacityMinutes, plannedMinutes: capacityMinutes - remaining, freeWindows, items,
+  return { version: ENGINE_VERSION+(input.useStudyCycle?'/cycle-2':''), capacityMinutes, plannedMinutes: capacityMinutes - remaining, freeWindows, items,
     deferred: [...groups].map(([competencyId, options]) => ({ competencyId,
       reason: options.length ? 'Menor valor dentro da capacidade e dos limites de hoje' : 'Esforço ou duração incompatível com a disponibilidade' })) };
 }

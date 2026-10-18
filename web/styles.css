@@ -28,3 +28,5 @@
 .draft-notice{margin:16px 0;padding:14px;border:1px solid var(--line);border-radius:10px;background:var(--soft)}.draft-notice p{margin:0;line-height:1.6}.draft-notice button{margin-top:8px}.plan-reference{margin-top:24px;line-height:1.7}.plan-history{margin:24px 0;padding:18px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}.plan-history .progress-row>span{overflow-wrap:anywhere;max-width:100%}@media(max-width:620px){.plan-history .progress-row{align-items:flex-start;flex-direction:column}}
 
 .form-fields{border:0;padding:0;margin:0;min-width:0}
+
+.learning-evidence{margin:20px 0;padding:16px 0;border-top:1px solid var(--line);font-size:13px;line-height:1.7}.learning-evidence p{margin:14px 0}.learning-evidence li{margin:10px 0}.learning-evidence a{overflow-wrap:anywhere}

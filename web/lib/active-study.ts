@@ -1,6 +1,6 @@
 import { z } from 'zod';
 const draftSchema=z.object({ id:z.uuid(), competencyId:z.string().min(1), method:z.enum(['priming','reading','recall','questions','new']),
-  minutes:z.number().int().min(1).max(90), small:z.boolean(), startedAt:z.iso.datetime(), pausedAt:z.number().nullable(), pausedMs:z.number().nonnegative() });
+  minutes:z.number().int().min(1).max(90), small:z.boolean(), startedAt:z.iso.datetime(), pausedAt:z.number().nullable(), pausedMs:z.number().nonnegative(),objective:z.string().max(300).optional() });
 export type StudyDraft=z.infer<typeof draftSchema>;
 const key=(userId:string)=>`studygram:active-study:${userId}`;
 export function readDraft(userId:string):StudyDraft|null {

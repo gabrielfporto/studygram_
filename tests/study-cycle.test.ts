@@ -47,3 +47,35 @@ test('Ciclo: após preparar um assunto, o plano avança à teoria em vez de só 
   assert.equal(plan.items[0]!.competencyId,c.id);assert.equal(plan.items[0]!.method,'reading');
   assert.equal(plan.plannedMinutes,25);
 });
+
+test('Ciclo baseado em objetivo: recuperação usa duração configurada e limita fragmentação sem preencher o dia',()=>{
+  const studied={...c,completedStages:['priming','theory'] as StudyStage[],reviewMinutes:25};
+  assert.equal(nextStudyStep(studied,START).minutes,25);
+  const candidates=Array.from({length:8},(_,i)=>({...studied,id:`recall-${i}`}));
+  const plan=planDay({...inputFor(candidates,180),minimumSession:5,useStudyCycle:true});
+  assert.equal(plan.items.length,3);assert.equal(plan.plannedMinutes,75);
+  assert(plan.items.every(i=>i.minutes===25));assert.equal(plan.version.endsWith('/cycle-2'),true);
+  const small=planDay({...inputFor(candidates,30),minimumSession:5,useStudyCycle:true,startSmall:true});
+  assert.equal(small.items.length,1);assert.equal(small.plannedMinutes,5);
+});
+
+test('Ciclo: não espalha preparações e não sacrifica prioridade para encaixar muitas revisões baratas',()=>{
+  const prep=Array.from({length:8},(_,i)=>({...c,id:`prep-${i}`}));
+  assert.equal(planDay({...inputFor(prep,60),minimumSession:5,useStudyCycle:true}).items.length,1);
+  const long={...c,id:'long',completedStages:['priming','theory'] as StudyStage[],reviewMinutes:30,manualPriority:1,importance:1};
+  const shorts=Array.from({length:6},(_,i)=>({...long,id:`short-${i}`,reviewMinutes:10,manualPriority:0,importance:0}));
+  const plan=planDay({...inputFor([long,...shorts],30),minimumSession:5,useStudyCycle:true});
+  assert.equal(plan.items[0]!.competencyId,'long');assert.equal(plan.items.length,1);
+});
+
+test('Ciclo novo: respeita conflito, esforço, orçamento, determinismo e revisão ainda futura',()=>{
+  const ready={...c,completedStages:['priming','theory','retrieval','questions'] as StudyStage[],reviewMinutes:20,effort:'high' as const,card:{...c.card,reps:1,due:START}};
+  const candidates=Array.from({length:6},(_,i)=>({...ready,id:`r-${i}`}));
+  const input={...inputFor(candidates,60),minimumSession:5,useStudyCycle:true,busy:[{start:START.getTime()+10*60000,end:START.getTime()+30*60000,status:'busy' as const}]};
+  const plan=planDay(input);
+  assert.deepEqual(planDay({...input,competencies:[...candidates].reverse()}),plan);
+  assert(plan.plannedMinutes<=40);assert(plan.items.every(i=>i.end<=START.getTime()+10*60000||i.start>=START.getTime()+30*60000));
+  assert.equal(planDay({...input,maxEffort:'low'}).items.length,0);
+  assert.equal(planDay({...input,spentMinutes:60}).items.length,0);
+  assert.equal(planDay({...input,competencies:candidates.map(x=>({...x,card:{...x.card,due:new Date(START.getTime()+86400000)}}))}).items.length,0);
+});

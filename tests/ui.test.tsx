@@ -86,6 +86,16 @@ test('Progresso: ausência de evidência não fabrica taxa de acerto',()=>{
   assert(screen.getByText('Registre uma recuperação para começar'));
 });
 
+test('Sessão: fim da estimativa permite continuar sem concluir nem gravar e expõe referências',()=>{
+  let changed:unknown=null,saved=false;
+  const draft={id:crypto.randomUUID(),competencyId:data.competencies[0]!.id,minutes:5,method:'recall' as const,small:true,startedAt:new Date(Date.now()-600000).toISOString(),pausedAt:Date.now(),pausedMs:0};
+  render(<GuidedSession draft={draft} competency={data.competencies[0]!} onChange={d=>{changed=d;}} onSave={async()=>{saved=true;}} onHide={()=>{}} onDiscard={()=>{}}/>);
+  fireEvent.click(screen.getByRole('button',{name:'Continuar neste assunto'}));
+  assert.equal((changed as {pausedAt:number|null}).pausedAt,null);assert.equal(saved,false);
+  assert(screen.getByText(/Continue no mesmo assunto, sem pressa/));
+  assert(screen.getByRole('link',{name:/Trumble/}));assert(screen.getByText(/Cinco minutos são uma porta de entrada/));
+});
+
 test('Progresso: Diagnóstico abre ações explícitas e bloqueia outra sessão quando há uma em andamento',()=>{
   const id=data.competencies[0]!.id;let action:unknown=null;
   const sessions=[1,2].map(n=>({id:String(n),competency_id:id,actual_minutes:5,started_at:START.toISOString(),ended_at:START.toISOString(),status:'completed',method:'recall',feedback:1}));
